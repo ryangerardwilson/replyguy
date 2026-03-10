@@ -30,8 +30,9 @@ flags:
 
 features:
   open the inbox in your editor, then digest it on exit and act on it
-  # gi
+  # gi [<path_to_input_txt_or_md_file>]
   replyguy gi
+  replyguy gi ~/tmp/ideas.txt
 
   open the latest digest output in your editor
   # go

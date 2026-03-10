@@ -23,7 +23,7 @@ class CodexResponder:
             "properties": {
                 "post": {
                     "type": "object",
-                    "additionalProperties": True,
+                    "additionalProperties": False,
                     "properties": {
                         "should_post": {"type": "boolean"},
                         "topic": {"type": "string"},

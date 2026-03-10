@@ -33,8 +33,9 @@ flags:
 
 features:
   open the inbox in your editor, then digest it on exit and act on it
-  # gi
+  # gi [<path_to_input_txt_or_md_file>]
   replyguy gi
+  replyguy gi ~/tmp/ideas.txt
 
   open the latest digest output in your editor
   # go
@@ -68,6 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("-v", action="store_true", dest="version")
     parser.add_argument("-u", action="store_true", dest="upgrade")
     parser.add_argument("command", nargs="?")
+    parser.add_argument("params", nargs=argparse.REMAINDER)
     return parser
 
 
@@ -153,20 +155,30 @@ def open_config() -> int:
     return open_in_editor(config_path())
 
 
-def open_gi() -> int:
+def open_gi(input_path: str | None = None) -> int:
     ensure_dirs()
-    gi_path = live_gi_path()
-    if not gi_path.exists():
-        gi_path.write_text(
-            "<!-- Paste post seeds, URLs, snippets, and reply targets here. -->\n",
-            encoding="utf-8",
-        )
-    rc = open_in_editor(gi_path)
-    if rc != 0:
-        return rc
-    from .pipeline import process_gi_file
+    from .pipeline import process_gi_file, process_inbox
 
-    result = process_gi_file()
+    if input_path:
+        source_path = Path(input_path).expanduser()
+        if not source_path.exists() or not source_path.is_file():
+            raise ReplyGuyError(f"missing input file: {source_path}")
+        try:
+            inbox_text = source_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise ReplyGuyError(f"failed to read input file `{source_path}`: {exc}") from exc
+        result = process_inbox(inbox_text, "gi")
+    else:
+        gi_path = live_gi_path()
+        if not gi_path.exists():
+            gi_path.write_text(
+                "<!-- Paste post seeds, URLs, snippets, and reply targets here. -->\n",
+                encoding="utf-8",
+            )
+        rc = open_in_editor(gi_path)
+        if rc != 0:
+            return rc
+        result = process_gi_file()
     if result is None:
         print("replyguy gi: inbox empty")
         return 0
@@ -239,17 +251,31 @@ def main(argv: list[str] | None = None) -> int:
 
     command = parsed.command
     if command == "gi":
-        return open_gi()
+        if len(parsed.params) > 1:
+            raise ReplyGuyError("valid shape: `replyguy gi [<path_to_input_txt_or_md_file>]`")
+        return open_gi(parsed.params[0] if parsed.params else None)
     if command == "go":
+        if parsed.params:
+            raise ReplyGuyError("valid shape: `replyguy go`")
         return open_go()
     if command == "conf":
+        if parsed.params:
+            raise ReplyGuyError("valid shape: `replyguy conf`")
         return open_config()
     if command == "ti":
+        if parsed.params:
+            raise ReplyGuyError("valid shape: `replyguy ti`")
         return install_timer()
     if command == "td":
+        if parsed.params:
+            raise ReplyGuyError("valid shape: `replyguy td`")
         return disable_timer()
     if command == "st":
+        if parsed.params:
+            raise ReplyGuyError("valid shape: `replyguy st`")
         return timer_status()
     if command == "_tick":
+        if parsed.params:
+            raise ReplyGuyError("valid shape: `replyguy _tick`")
         return tick()
     raise ReplyGuyError(f"unknown command: {command}")

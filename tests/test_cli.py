@@ -21,6 +21,7 @@ class ReplyGuyCliTests(unittest.TestCase):
         self.assertIn("Replyguy CLI", help_output)
         self.assertIn("features:", help_output)
         self.assertIn("replyguy gi", help_output)
+        self.assertIn("replyguy gi ~/tmp/ideas.txt", help_output)
         self.assertIn("replyguy go", help_output)
         self.assertNotIn("commands:", help_output)
 
@@ -66,6 +67,22 @@ class ReplyGuyCliTests(unittest.TestCase):
                         )()
                         code = main(["gi"])
                 self.assertEqual(code, 0)
+
+    def test_gi_with_input_path_skips_editor(self) -> None:
+        with TemporaryDirectory() as tmp:
+            input_path = Path(tmp) / "ideas.txt"
+            input_path.write_text("post about agents\n", encoding="utf-8")
+            with patch("replyguy.cli.open_in_editor") as open_in_editor_mock:
+                with patch("replyguy.pipeline.process_inbox") as process_inbox:
+                    process_inbox.return_value = type(
+                        "Result",
+                        (),
+                        {"summary": "posted=yes replies=1"},
+                    )()
+                    code = main(["gi", str(input_path)])
+        self.assertEqual(code, 0)
+        open_in_editor_mock.assert_not_called()
+        process_inbox.assert_called_once()
 
     def test_build_runtime_command_uses_launcher_only_when_frozen(self) -> None:
         with patch("sys.executable", "/tmp/replyguy"), patch("sys.frozen", True, create=True):

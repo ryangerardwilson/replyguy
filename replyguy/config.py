@@ -9,26 +9,14 @@ from typing import Any
 from .paths import config_path, ensure_dirs
 
 DEFAULT_CONFIG: dict[str, Any] = {
-    "codex_model": "gpt-5-codex",
-    "codex_reasoning_effort": "high",
+    "codex_model": "gpt-5.4",
+    "codex_reasoning_effort": "xhigh",
     "codex_context_paths": [
-        "/home/ryan/Documents/agent_context/THOUGHT_LEADERSHIP.md",
-        "/home/ryan/Documents/agent_context/BRAND_GUIDELINES.md",
+        "/home/ryan/Documents/agent_context/REPLY_GUY_GUIDELINES.md",
     ],
-    "resume_url": "https://ryangerardwilson.com/resume.pdf",
-    "daily_topic_sources": [
-        "https://news.ycombinator.com/rss",
-        "https://lobste.rs/rss",
-    ],
-    "daily_context_notes": "",
-    "timer_on_calendar": "*-*-* 09:00:00",
     "reply_count_per_target": 4,
-    "max_recent_memory": 12,
-    "x_post_command": ["x", "p"],
-    "x_auth_command": ["x", "ea"],
-    "linkedin_post_command": ["linkedin", "p"],
-    "linkedin_auth_command": ["linkedin", "ea"],
 }
+
 
 def _merge_defaults(value: dict[str, Any]) -> dict[str, Any]:
     merged = deepcopy(DEFAULT_CONFIG)

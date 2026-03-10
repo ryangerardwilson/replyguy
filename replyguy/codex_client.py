@@ -21,33 +21,6 @@ class CodexResponder:
             "type": "object",
             "additionalProperties": False,
             "properties": {
-                "post": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "should_post": {"type": "boolean"},
-                        "topic": {"type": "string"},
-                        "career_why": {"type": "string"},
-                        "crux": {"type": "string"},
-                        "angle": {"type": "string"},
-                        "linkedin_draft": {"type": "string"},
-                        "x_draft": {"type": "string"},
-                        "source_urls": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                        },
-                    },
-                    "required": [
-                        "should_post",
-                        "topic",
-                        "career_why",
-                        "crux",
-                        "angle",
-                        "linkedin_draft",
-                        "x_draft",
-                        "source_urls",
-                    ],
-                },
                 "replies": {
                     "type": "array",
                     "items": {
@@ -85,7 +58,7 @@ class CodexResponder:
                     },
                 },
             },
-            "required": ["post", "replies", "skipped"],
+            "required": ["replies", "skipped"],
         }
         prompt = (
             f"{system_prompt}\n\n"

@@ -14,14 +14,14 @@ from _version import __version__
 from .config import load_config
 from .editor import open_in_editor
 from .errors import ReplyGuyError
-from .paths import config_path, ensure_dirs, live_go_path, live_gi_path
+from .paths import config_path, ensure_dirs, live_muse_path, live_rant_path
 
 ANSI_RESET = "\033[0m"
 ANSI_GRAY = "\033[38;5;245m"
 INSTALL_SCRIPT_URL = "https://raw.githubusercontent.com/ryangerardwilson/replyguy/main/install.sh"
 
 HELP_TEXT = """Replyguy CLI
-turn a vim-first inbox into posted thought leadership and reply drafts
+turn rants into muses you can copy-paste manually
 
 flags:
   replyguy -h
@@ -32,24 +32,18 @@ flags:
     upgrade to the latest release
 
 features:
-  open the inbox in your editor, then launch digesting in the background
-  # gi [<path_to_input_txt_or_md_file>]
-  replyguy gi
-  replyguy gi ~/tmp/ideas.txt
+  open the rant file in your editor, then launch drafting in the background
+  # rant [<path_to_input_txt_or_md_file>]
+  replyguy rant
+  replyguy rant ~/tmp/ideas.txt
 
-  open the latest digest output in your editor
-  # go
-  replyguy go
+  open the latest muse output in your editor, then clear it on close
+  # muse
+  replyguy muse
 
   open the config in your editor
   # conf
   replyguy conf
-
-  install, disable, or inspect the daily timer
-  # ti|td|st
-  replyguy ti
-  replyguy td
-  replyguy st
 """
 
 
@@ -100,132 +94,55 @@ def _spawn_background(*args: str) -> None:
     )
 
 
-def _systemctl_user(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["systemctl", "--user", *args],
-        check=True,
-        text=True,
-        capture_output=True,
-    )
-
-
-def write_timer_units() -> None:
-    ensure_dirs()
-    systemd_dir = Path.home() / ".config" / "systemd" / "user"
-    systemd_dir.mkdir(parents=True, exist_ok=True)
-    service_path = systemd_dir / "replyguy.service"
-    timer_path = systemd_dir / "replyguy.timer"
-    timer_on_calendar = str(load_config().get("timer_on_calendar") or "*-*-* 09:00:00")
-    tick_command = _build_runtime_command("_tick")
-    service_body = "\n".join(
-        [
-            "[Unit]",
-            "Description=replyguy daily thought-leadership run",
-            "",
-            "[Service]",
-            "Type=oneshot",
-            f"WorkingDirectory={Path(__file__).resolve().parents[1]}",
-            f"ExecStart=/usr/bin/env bash -lc {shlex.quote(tick_command)}",
-            "",
-        ]
-    )
-    timer_body = "\n".join(
-        [
-            "[Unit]",
-            "Description=Run replyguy daily",
-            "",
-            "[Timer]",
-            f"OnCalendar={timer_on_calendar}",
-            "Persistent=true",
-            "",
-            "[Install]",
-            "WantedBy=timers.target",
-            "",
-        ]
-    )
-    service_path.write_text(service_body, encoding="utf-8")
-    timer_path.write_text(timer_body, encoding="utf-8")
-
-
-def install_timer() -> int:
-    write_timer_units()
-    _systemctl_user("daemon-reload")
-    _systemctl_user("enable", "--now", "replyguy.timer")
-    print("timer enabled: replyguy.timer")
-    return 0
-
-
-def disable_timer() -> int:
-    write_timer_units()
-    _systemctl_user("disable", "--now", "replyguy.timer")
-    print("timer disabled: replyguy.timer")
-    return 0
-
-
-def timer_status() -> int:
-    result = _systemctl_user("status", "replyguy.timer")
-    print(result.stdout.strip())
-    return 0
-
-
 def open_config() -> int:
     ensure_dirs()
     load_config()
     return open_in_editor(config_path())
 
 
-def open_gi(input_path: str | None = None) -> int:
+def open_rant(input_path: str | None = None) -> int:
     ensure_dirs()
     if input_path:
         source_path = Path(input_path).expanduser()
         if not source_path.exists() or not source_path.is_file():
             raise ReplyGuyError(f"missing input file: {source_path}")
-        _spawn_background("_gi_file", str(source_path))
-        print(f"replyguy gi: started background job for {source_path}")
+        _spawn_background("_rant_file", str(source_path))
+        print(f"replyguy rant: started background job for {source_path}")
     else:
-        gi_path = live_gi_path()
-        if not gi_path.exists():
-            gi_path.write_text(
-                "<!-- Paste post seeds, URLs, snippets, and reply targets here. -->\n",
+        rant_path = live_rant_path()
+        if not rant_path.exists():
+            rant_path.write_text(
+                "<!-- Paste the posts, URLs, snippets, and raw ideas you want turned into replies here. -->\n",
                 encoding="utf-8",
             )
-        rc = open_in_editor(gi_path)
+        rc = open_in_editor(rant_path)
         if rc != 0:
             return rc
-        _spawn_background("_gi_live")
-        print("replyguy gi: started background job")
+        _spawn_background("_rant_live")
+        print("replyguy rant: started background job")
     return 0
 
 
-def open_go() -> int:
+def open_muse() -> int:
     ensure_dirs()
-    go_path = live_go_path()
-    if not go_path.exists():
-        go_path.write_text("# replyguy digest\n\n- no digest yet\n", encoding="utf-8")
-    return open_in_editor(go_path)
+    muse_path = live_muse_path()
+    if not muse_path.exists():
+        muse_path.write_text("# replyguy muse\n\n- no muse yet\n", encoding="utf-8")
+    rc = open_in_editor(muse_path)
+    muse_path.write_text("", encoding="utf-8")
+    return rc
 
 
-def tick() -> int:
-    from .pipeline import process_timer_tick
+def process_rant_live() -> int:
+    from .pipeline import process_rant_file
 
-    result = process_timer_tick()
-    if result is None:
-        print("replyguy tick: no work")
-        return 0
-    print(result.summary)
-    return 0
-
-
-def process_gi_live() -> int:
-    from .pipeline import process_gi_file
-
-    result = process_gi_file()
+    result = process_rant_file()
     if result is None:
         return 0
     return 0
 
 
-def process_gi_file_path(input_path: str) -> int:
+def process_rant_file_path(input_path: str) -> int:
     from .pipeline import process_inbox
 
     source_path = Path(input_path).expanduser()
@@ -235,7 +152,7 @@ def process_gi_file_path(input_path: str) -> int:
         inbox_text = source_path.read_text(encoding="utf-8")
     except OSError as exc:
         raise ReplyGuyError(f"failed to read input file `{source_path}`: {exc}") from exc
-    process_inbox(inbox_text, "gi")
+    process_inbox(inbox_text, "rant")
     return 0
 
 
@@ -284,40 +201,24 @@ def main(argv: list[str] | None = None) -> int:
         raise ReplyGuyError("`replyguy -u` cannot be combined with another action")
 
     command = parsed.command
-    if command == "gi":
+    if command == "rant":
         if len(parsed.params) > 1:
-            raise ReplyGuyError("valid shape: `replyguy gi [<path_to_input_txt_or_md_file>]`")
-        return open_gi(parsed.params[0] if parsed.params else None)
-    if command == "go":
+            raise ReplyGuyError("valid shape: `replyguy rant [<path_to_input_txt_or_md_file>]`")
+        return open_rant(parsed.params[0] if parsed.params else None)
+    if command == "muse":
         if parsed.params:
-            raise ReplyGuyError("valid shape: `replyguy go`")
-        return open_go()
+            raise ReplyGuyError("valid shape: `replyguy muse`")
+        return open_muse()
     if command == "conf":
         if parsed.params:
             raise ReplyGuyError("valid shape: `replyguy conf`")
         return open_config()
-    if command == "ti":
+    if command == "_rant_live":
         if parsed.params:
-            raise ReplyGuyError("valid shape: `replyguy ti`")
-        return install_timer()
-    if command == "td":
-        if parsed.params:
-            raise ReplyGuyError("valid shape: `replyguy td`")
-        return disable_timer()
-    if command == "st":
-        if parsed.params:
-            raise ReplyGuyError("valid shape: `replyguy st`")
-        return timer_status()
-    if command == "_gi_live":
-        if parsed.params:
-            raise ReplyGuyError("valid shape: `replyguy _gi_live`")
-        return process_gi_live()
-    if command == "_gi_file":
+            raise ReplyGuyError("valid shape: `replyguy _rant_live`")
+        return process_rant_live()
+    if command == "_rant_file":
         if len(parsed.params) != 1:
-            raise ReplyGuyError("valid shape: `replyguy _gi_file <path>`")
-        return process_gi_file_path(parsed.params[0])
-    if command == "_tick":
-        if parsed.params:
-            raise ReplyGuyError("valid shape: `replyguy _tick`")
-        return tick()
+            raise ReplyGuyError("valid shape: `replyguy _rant_file <path>`")
+        return process_rant_file_path(parsed.params[0])
     raise ReplyGuyError(f"unknown command: {command}")

@@ -29,20 +29,16 @@ def config_path() -> Path:
     return config_dir() / "config.json"
 
 
-def live_gi_path() -> Path:
-    return state_dir() / "gi.md"
+def live_rant_path() -> Path:
+    return state_dir() / "rant.md"
 
 
-def live_go_path() -> Path:
-    return state_dir() / "go.md"
+def live_muse_path() -> Path:
+    return state_dir() / "muse.md"
 
 
 def archive_dir() -> Path:
     return state_dir() / "jobs"
-
-
-def db_path() -> Path:
-    return state_dir() / "state.db"
 
 
 def lock_path() -> Path:

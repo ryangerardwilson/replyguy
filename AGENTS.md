@@ -1,33 +1,28 @@
 # replyguy Agent Guide
 
 ## Scope
-- `replyguy` is a terminal-native orchestrator for daily LinkedIn/X posting and local reply drafting from a Vim-first inbox.
+- `replyguy` is a terminal-native reply drafting tool that turns rough rants into usable muses.
 - The product is keyboard-first, explicit, local-first, and inspectable. It is not a web dashboard.
-- Public repo, private runtime state: keep `gi`, `go`, archives, SQLite, and config in XDG paths outside the repo.
-- Use the existing `x` and `linkedin` CLIs for actual posting. Do not reimplement their auth flows here unless the user explicitly asks for that.
-
-## Durable Deviations
-- This app intentionally overrides the workspace thought-leadership rule that normally requires explicit approval before posting.
-- For `replyguy`, unattended posting triggered locally by `replyguy gi` or the installed timer is allowed because the user explicitly asked for that behavior.
-- Keep that exception documented here so later agents do not silently revert it.
+- Public repo, private runtime state: keep `rant`, `muse`, archives, and config in XDG paths outside the repo.
+- `replyguy` does not post anywhere. It only turns raw inputs into reply suggestions the user can copy-paste manually.
 
 ## Product Rules
-- `replyguy gi` opens the live inbox in `$VISUAL`, then `$EDITOR`, then `vim`. Exiting the editor digests the file and may publish directly to LinkedIn and X.
-- `replyguy go` opens the latest digest output file.
-- `replyguy` must archive the consumed inbox before clearing it.
-- Clear the live inbox only after the digest file and SQLite writes succeed.
-- If processing fails before the output is committed, leave the live inbox intact.
-- Auto-replies are out of scope. `replyguy` suggests replies, but the user posts them manually.
+- `replyguy rant` opens the live rant file in `$VISUAL`, then `$EDITOR`, then `vim`. Exiting the editor processes the file and writes reply suggestions.
+- `replyguy muse` opens the latest muse output file, then clears the live file after the editor closes.
+- `replyguy` must archive the consumed rant before clearing it.
+- Clear the live rant only after the muse file write succeeds.
+- If processing fails before the output is committed, leave the live rant intact.
+- `replyguy` suggests replies, but the user posts them manually.
 
 ## Content Rules
-- For autonomous daily posting, source order is: latest resume, live discourse, brand voice, then nearby docs.
 - Keep the writing direct, technically grounded, and anti-sludge.
-- Same crux may recur across days, but avoid repeating the same `crux + angle` pair too soon.
-- Keep LinkedIn plain text and keep X within 280 characters.
+- Use the user's pasted ideas and the linked post text as the primary material.
+- Favor thoughtful, specific, non-cringe replies over generic applause or engagement bait.
+- The reply should meet or exceed the literary quality of the source post.
+- If the post is elegant, the reply cannot be flatter, duller, or more generic than the post itself.
 
 ## Implementation Rules
 - Keep the help path import-light and side-effect free.
 - Keep HTTP logic out of CLI parsing; use small dedicated client modules.
-- Prefer plain JSON config and SQLite over heavier local infrastructure.
-- Timer automation should use a user-level `systemd` timer.
+- Prefer plain JSON config and flat files over heavier local infrastructure.
 - Notifications should go through `notify-send` so Mako can display them.

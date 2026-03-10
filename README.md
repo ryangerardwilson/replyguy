@@ -1,10 +1,9 @@
 # replyguy
 
-Vim-first CLI that turns one local inbox into:
+Vim-first CLI that turns one local rant into:
 
-- a daily LinkedIn/X post pair
 - reply-guy suggestions for other people's posts
-- an archived digest with what was posted and what can be replied with
+- an archived muse with reply options you can copy-paste manually
 
 The repo can be public because all mutable runtime state stays outside the repo
 in XDG directories.
@@ -29,28 +28,28 @@ flags:
     upgrade to the latest release
 
 features:
-  open the inbox in your editor, then launch digesting in the background
-  # gi [<path_to_input_txt_or_md_file>]
-  replyguy gi
-  replyguy gi ~/tmp/ideas.txt
+  open the rant file in your editor, then launch drafting in the background
+  # rant [<path_to_input_txt_or_md_file>]
+  replyguy rant
+  replyguy rant ~/tmp/ideas.txt
 
-  open the latest digest output in your editor
-  # go
-  replyguy go
+  open the latest muse output in your editor, then clear it on close
+  # muse
+  replyguy muse
 
   open the config in your editor
   # conf
   replyguy conf
-
-  install, disable, or inspect the daily timer
-  # ti|td|st
-  replyguy ti
-  replyguy td
-  replyguy st
 ```
 
-`replyguy gi` launches the work in the background and returns your terminal
+`replyguy rant` launches the work in the background and returns your terminal
 immediately. Completion or failure is reported through Mako via `notify-send`.
+`replyguy` does not publish to LinkedIn or X. It only drafts replies for manual
+posting.
+
+`replyguy muse` opens the latest generated output and clears the live `muse`
+file after you close the editor. Archived per-run muses remain under the jobs
+directory.
 
 ## Config
 
@@ -71,21 +70,21 @@ The default config stores:
 - Codex model
 - Codex reasoning effort
 - `codex_context_paths` for local docs that should be injected before drafting
-- resume URL
-- daily topic source URLs
-- timer schedule
-- posting command tokens for `x` and `linkedin`
+- reply count per target
 
 `replyguy` uses the local `codex` CLI for generation, so you need to be logged in
 with `codex login`.
+
+By default, `replyguy` injects only
+`/home/ryan/Documents/agent_context/REPLY_GUY_GUIDELINES.md` as standing
+context for drafting.
 
 ## State
 
 Runtime state lives outside the repo:
 
-- live inbox and digest under `~/.local/state/replyguy/`
+- live rant and muse under `~/.local/state/replyguy/`
 - job archives under `~/.local/state/replyguy/jobs/`
-- SQLite DB under `~/.local/state/replyguy/state.db`
 
 That local state is not committed and is not part of the public repo.
 

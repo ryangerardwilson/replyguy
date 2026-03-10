@@ -1,0 +1,58 @@
+from __future__ import annotations
+
+import json
+import os
+from copy import deepcopy
+from pathlib import Path
+from typing import Any
+
+from .paths import config_path, ensure_dirs
+
+DEFAULT_CONFIG: dict[str, Any] = {
+    "codex_model": "gpt-5-codex",
+    "codex_reasoning_effort": "high",
+    "resume_url": "https://ryangerardwilson.com/resume.pdf",
+    "daily_topic_sources": [
+        "https://news.ycombinator.com/rss",
+        "https://lobste.rs/rss",
+    ],
+    "daily_context_notes": "",
+    "timer_on_calendar": "*-*-* 09:00:00",
+    "reply_count_per_target": 4,
+    "max_recent_memory": 12,
+    "x_post_command": ["x", "p"],
+    "x_auth_command": ["x", "ea"],
+    "linkedin_post_command": ["linkedin", "p"],
+    "linkedin_auth_command": ["linkedin", "ea"],
+}
+
+def _merge_defaults(value: dict[str, Any]) -> dict[str, Any]:
+    merged = deepcopy(DEFAULT_CONFIG)
+    for key, item in value.items():
+        merged[key] = item
+    return merged
+
+
+def load_config() -> dict[str, Any]:
+    ensure_dirs()
+    path = config_path()
+    if not path.exists():
+        save_config(deepcopy(DEFAULT_CONFIG))
+        return deepcopy(DEFAULT_CONFIG)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        save_config(deepcopy(DEFAULT_CONFIG))
+        return deepcopy(DEFAULT_CONFIG)
+    if not isinstance(data, dict):
+        save_config(deepcopy(DEFAULT_CONFIG))
+        return deepcopy(DEFAULT_CONFIG)
+    merged = _merge_defaults(data)
+    if merged != data:
+        save_config(merged)
+    return merged
+
+
+def save_config(config: dict[str, Any]) -> None:
+    ensure_dirs()
+    config_path().write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")

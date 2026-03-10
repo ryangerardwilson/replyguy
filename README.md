@@ -29,7 +29,7 @@ flags:
     upgrade to the latest release
 
 features:
-  open the inbox in your editor, then digest it on exit and act on it
+  open the inbox in your editor, then launch digesting in the background
   # gi [<path_to_input_txt_or_md_file>]
   replyguy gi
   replyguy gi ~/tmp/ideas.txt
@@ -49,8 +49,8 @@ features:
   replyguy st
 ```
 
-`replyguy gi` may publish directly to LinkedIn and X when the inbox contains
-usable post guidance.
+`replyguy gi` launches the work in the background and returns your terminal
+immediately. Completion or failure is reported through Mako via `notify-send`.
 
 ## Config
 

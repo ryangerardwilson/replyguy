@@ -32,7 +32,7 @@ flags:
     upgrade to the latest release
 
 features:
-  open the inbox in your editor, then digest it on exit and act on it
+  open the inbox in your editor, then launch digesting in the background
   # gi [<path_to_input_txt_or_md_file>]
   replyguy gi
   replyguy gi ~/tmp/ideas.txt
@@ -79,6 +79,25 @@ def _build_runtime_command(*args: str) -> str:
         command_parts.append(shlex.quote(str(Path(__file__).resolve().parents[1] / "main.py")))
     command_parts.extend(shlex.quote(arg) for arg in args)
     return " ".join(command_parts)
+
+
+def _runtime_argv(*args: str) -> list[str]:
+    command_parts = [str(Path(sys.executable).resolve())]
+    if not getattr(sys, "frozen", False):
+        command_parts.append(str(Path(__file__).resolve().parents[1] / "main.py"))
+    command_parts.extend(args)
+    return command_parts
+
+
+def _spawn_background(*args: str) -> None:
+    subprocess.Popen(
+        _runtime_argv(*args),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+        cwd=str(Path(__file__).resolve().parents[1]),
+    )
 
 
 def _systemctl_user(*args: str) -> subprocess.CompletedProcess[str]:
@@ -157,17 +176,12 @@ def open_config() -> int:
 
 def open_gi(input_path: str | None = None) -> int:
     ensure_dirs()
-    from .pipeline import process_gi_file, process_inbox
-
     if input_path:
         source_path = Path(input_path).expanduser()
         if not source_path.exists() or not source_path.is_file():
             raise ReplyGuyError(f"missing input file: {source_path}")
-        try:
-            inbox_text = source_path.read_text(encoding="utf-8")
-        except OSError as exc:
-            raise ReplyGuyError(f"failed to read input file `{source_path}`: {exc}") from exc
-        result = process_inbox(inbox_text, "gi")
+        _spawn_background("_gi_file", str(source_path))
+        print(f"replyguy gi: started background job for {source_path}")
     else:
         gi_path = live_gi_path()
         if not gi_path.exists():
@@ -178,11 +192,8 @@ def open_gi(input_path: str | None = None) -> int:
         rc = open_in_editor(gi_path)
         if rc != 0:
             return rc
-        result = process_gi_file()
-    if result is None:
-        print("replyguy gi: inbox empty")
-        return 0
-    print(result.summary)
+        _spawn_background("_gi_live")
+        print("replyguy gi: started background job")
     return 0
 
 
@@ -202,6 +213,29 @@ def tick() -> int:
         print("replyguy tick: no work")
         return 0
     print(result.summary)
+    return 0
+
+
+def process_gi_live() -> int:
+    from .pipeline import process_gi_file
+
+    result = process_gi_file()
+    if result is None:
+        return 0
+    return 0
+
+
+def process_gi_file_path(input_path: str) -> int:
+    from .pipeline import process_inbox
+
+    source_path = Path(input_path).expanduser()
+    if not source_path.exists() or not source_path.is_file():
+        raise ReplyGuyError(f"missing input file: {source_path}")
+    try:
+        inbox_text = source_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ReplyGuyError(f"failed to read input file `{source_path}`: {exc}") from exc
+    process_inbox(inbox_text, "gi")
     return 0
 
 
@@ -274,6 +308,14 @@ def main(argv: list[str] | None = None) -> int:
         if parsed.params:
             raise ReplyGuyError("valid shape: `replyguy st`")
         return timer_status()
+    if command == "_gi_live":
+        if parsed.params:
+            raise ReplyGuyError("valid shape: `replyguy _gi_live`")
+        return process_gi_live()
+    if command == "_gi_file":
+        if len(parsed.params) != 1:
+            raise ReplyGuyError("valid shape: `replyguy _gi_file <path>`")
+        return process_gi_file_path(parsed.params[0])
     if command == "_tick":
         if parsed.params:
             raise ReplyGuyError("valid shape: `replyguy _tick`")

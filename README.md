@@ -70,6 +70,7 @@ The default config stores:
 
 - Codex model
 - Codex reasoning effort
+- `codex_context_paths` for local docs that should be injected before drafting
 - resume URL
 - daily topic source URLs
 - timer schedule

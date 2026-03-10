@@ -11,6 +11,10 @@ from .paths import config_path, ensure_dirs
 DEFAULT_CONFIG: dict[str, Any] = {
     "codex_model": "gpt-5-codex",
     "codex_reasoning_effort": "high",
+    "codex_context_paths": [
+        "/home/ryan/Documents/agent_context/THOUGHT_LEADERSHIP.md",
+        "/home/ryan/Documents/agent_context/BRAND_GUIDELINES.md",
+    ],
     "resume_url": "https://ryangerardwilson.com/resume.pdf",
     "daily_topic_sources": [
         "https://news.ycombinator.com/rss",

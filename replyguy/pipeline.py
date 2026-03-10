@@ -146,7 +146,7 @@ def _user_prompt(
     recent_memory: list[dict[str, Any]],
     config: dict[str, Any],
 ) -> str:
-    instruction_docs = load_generation_instruction_context()
+    instruction_docs = load_generation_instruction_context(config)
     payload = {
         "mode": mode,
         "daily_context_notes": config.get("daily_context_notes") or "",

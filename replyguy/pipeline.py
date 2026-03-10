@@ -12,6 +12,7 @@ from .config import load_config
 from .codex_client import CodexResponder
 from .errors import ReplyGuyError
 from .fetch import FetchedSource, fetch_many, fetch_url
+from .instruction_context import load_generation_instruction_context
 from .notifications import notify
 from .parsing import extract_urls, has_meaningful_text, split_blocks
 from .paths import archive_dir, ensure_dirs, live_go_path, live_gi_path, lock_path
@@ -145,10 +146,14 @@ def _user_prompt(
     recent_memory: list[dict[str, Any]],
     config: dict[str, Any],
 ) -> str:
+    instruction_docs = load_generation_instruction_context()
     payload = {
         "mode": mode,
         "daily_context_notes": config.get("daily_context_notes") or "",
         "resume_text": resume_text,
+        "workspace_instruction_context": [
+            {"path": doc.path, "content": doc.content} for doc in instruction_docs
+        ],
         "recent_post_memory": recent_memory,
         "inbox_text": inbox_text,
         "materials": sources,

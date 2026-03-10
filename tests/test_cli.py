@@ -29,7 +29,7 @@ class ReplyGuyCliTests(unittest.TestCase):
         with patch("sys.stdout", new=StringIO()) as stdout:
             code = main(["-v"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "0.1.1")
+        self.assertEqual(stdout.getvalue().strip(), "0.1.2")
 
     def test_conf_prefers_visual(self) -> None:
         with TemporaryDirectory() as tmp:

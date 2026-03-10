@@ -94,6 +94,7 @@ def _system_prompt(reply_count: int) -> str:
         "- If the source post is elegant, the reply cannot answer in flatter or clumsier prose.\n"
         "- Prefer crisp, thought-provoking replies over longer explanatory paragraphs when both are defensible.\n"
         "- Win with cleaner phrasing and sharper distinctions, not with extra length.\n"
+        "- Use dry wit or smart sarcasm when it sharpens the point, but do not drift into unserious snark.\n"
         "- Prefer cleaner distinctions, stronger rhythm, and more exact language than the source material.\n"
         "- Add judgment, tradeoffs, or consequences instead of paraphrasing the post.\n"
         "- Avoid generic applause, vague agreement, and engagement bait.\n"

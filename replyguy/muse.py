@@ -8,7 +8,6 @@ from .bookmark_queue import load_queue, next_pending_item, remove_completed_item
 from .config import load_config
 from .editor import edit_text
 from .errors import ReplyGuyError
-from .pipeline import sync_bookmark_queue
 from .x_bridge import remove_bookmark, remove_bookmark_background
 
 REPLY_START = "<!-- reply-start -->"
@@ -135,16 +134,13 @@ def _copy_to_clipboard(text: str) -> None:
 def run_muse_session() -> int:
     config = load_config()
     queue = load_queue()
-    if next_pending_item(queue) is None:
-        sync_bookmark_queue()
-        queue = load_queue()
     _cleanup_posted_items(queue, config)
     queue = load_queue()
 
     while True:
         item = next_pending_item(queue)
         if item is None:
-            print("No bookmarked replies are queued.")
+            print("Nothing is queued for exhale. Run `replyguy inhale` first.")
             return 0
 
         _print_item(item)

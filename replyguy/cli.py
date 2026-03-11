@@ -114,6 +114,7 @@ def _write_timer_units() -> None:
     timer_path = systemd_dir / f"{_replyguy_unit_name()}.timer"
     entrypoint = Path(__file__).resolve().parents[1] / "main.py"
     run_command = _build_runtime_command("_inhale_bookmarks")
+    runtime_path = os.environ.get("PATH") or "/usr/local/bin:/usr/bin:/bin"
     service_body = "\n".join(
         [
             "[Unit]",
@@ -122,6 +123,7 @@ def _write_timer_units() -> None:
             "[Service]",
             "Type=oneshot",
             f"WorkingDirectory={entrypoint.parent}",
+            f"Environment=PATH={runtime_path}",
             f"ExecStart=/usr/bin/env bash -lc {shlex.quote(run_command)}",
             "",
         ]

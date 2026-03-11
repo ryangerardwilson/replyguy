@@ -1,5 +1,10 @@
 # replyguy Agent Guide
 
+## Workspace Defaults
+- Follow `/home/ryan/Documents/agent_context/CLI_TUI_STYLE_GUIDE.md` for CLI/TUI taste and help shape.
+- Follow `/home/ryan/Documents/agent_context/CANONICAL_REFERENCE_IMPLEMENTATION_FOR_CLI_AND_TUI_APPS.md` for executable contract details such as `-h`, `-v`, `-u`, installer behavior, release workflow expectations, and regression expectations.
+- This file only records `replyguy`-specific constraints or durable deviations.
+
 ## Scope
 - `replyguy` is a terminal-native reply drafting tool for bookmarked X posts.
 - The product is keyboard-first, explicit, local-first, and inspectable. It is not a web dashboard.
@@ -24,3 +29,4 @@
 - Keep HTTP logic out of CLI parsing; use small dedicated client modules.
 - Prefer plain JSON config and flat files over heavier local infrastructure.
 - Notifications should go through `notify-send` so Mako can display them.
+- `_version.py` is the single runtime version module. Keep the checked-in value as a placeholder and let tagged release automation stamp the shipped artifact with the real version.

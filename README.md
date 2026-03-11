@@ -129,3 +129,5 @@ python main.py -h
 replyguy -v
 replyguy -u
 ```
+
+`replyguy -v` prints the installed app version from `_version.py`. Source checkouts keep a placeholder value; tagged release builds should stamp the shipped artifact with the real version.

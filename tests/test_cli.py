@@ -100,6 +100,7 @@ class ReplyGuyCliTests(unittest.TestCase):
                 "X_CLIENT_ID": "client-id",
                 "X_CLIENT_SECRET": 'secret"value',
                 "XDG_DATA_HOME": "/tmp/data-home",
+                "X_RANDOM_UNUSED": "ignore-me",
             }
             with patch("pathlib.Path.home", return_value=home), patch.dict("os.environ", env, clear=False):
                 _write_timer_units()
@@ -109,6 +110,7 @@ class ReplyGuyCliTests(unittest.TestCase):
         self.assertIn('Environment="X_CLIENT_ID=client-id"', service_body)
         self.assertIn('Environment="X_CLIENT_SECRET=secret\\"value"', service_body)
         self.assertIn('Environment="XDG_DATA_HOME=/tmp/data-home"', service_body)
+        self.assertNotIn("X_RANDOM_UNUSED", service_body)
         self.assertIn("main.py _inhale_bookmarks", service_body)
 
     def test_upgrade_delegates_to_installer_upgrade_mode(self) -> None:

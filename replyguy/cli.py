@@ -108,17 +108,17 @@ def _replyguy_unit_name() -> str:
 
 
 def _timer_environment_lines() -> list[str]:
+    allowed_names = {
+        "X_CLIENT_ID",
+        "X_CLIENT_SECRET",
+        "TWITTER_CLIENT_ID",
+        "TWITTER_CLIENT_SECRET",
+        "X_OAUTH2_TOKEN_FILE",
+        "TWITTER_OAUTH2_TOKEN_FILE",
+        "XDG_DATA_HOME",
+    }
     names = sorted(
-        {
-            name
-            for name in os.environ
-            if name.startswith("X_") or name.startswith("TWITTER_")
-        }
-        | {
-            name
-            for name in ("XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME")
-            if os.environ.get(name)
-        }
+        name for name in allowed_names if os.environ.get(name)
     )
     lines: list[str] = []
     for name in names:

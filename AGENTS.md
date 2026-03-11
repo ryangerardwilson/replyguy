@@ -18,15 +18,16 @@
 - `replyguy status` reports whether inhale is currently running plus the queue state from local files.
 
 ## Content Rules
-- Keep the writing direct, technically grounded, and anti-sludge.
+- Keep content and tonality policy out of app-internal prompts when it can live in configured instruction context.
+- Treat configured context files such as `/home/ryan/Documents/agent_context/REPLY_GUY_GUIDELINES.md` as the owner of voice, taste, rhetorical moves, and reply-quality standards.
+- App-internal prompt text may enforce only execution-contract requirements such as task framing, JSON output shape, `reply` versus `skip`, concise `why_it_works`, and reply-count limits.
 - Use the user's pasted ideas and the linked post text as the primary material.
-- Favor thoughtful, specific, non-cringe replies over generic applause or engagement bait.
-- The reply should meet or exceed the literary quality of the source post.
-- If the post is elegant, the reply cannot be flatter, duller, or more generic than the post itself.
+- If a new content standard is durable and user-specific, add it to the configured guidelines rather than hardcoding it into the app prompt.
 
 ## Implementation Rules
 - Keep the help path import-light and side-effect free.
 - Keep HTTP logic out of CLI parsing; use small dedicated client modules.
 - Prefer plain JSON config and flat files over heavier local infrastructure.
 - Notifications should go through `notify-send` so Mako can display them.
+- Keep the internal Codex prompt neutral enough that another user could reuse the app with a different configured guideline file.
 - `_version.py` is the single runtime version module. Keep the checked-in value as a placeholder and let tagged release automation stamp the shipped artifact with the real version.

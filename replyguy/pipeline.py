@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fcntl
+import json
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
@@ -8,12 +9,15 @@ from pathlib import Path
 from typing import Any
 
 from .config import load_config
+from .bookmark_queue import load_queue, now_iso, save_queue
 from .codex_client import CodexResponder
 from .fetch import fetch_many
 from .instruction_context import load_generation_instruction_context
 from .notifications import notify
-from .parsing import extract_urls, has_meaningful_text, split_blocks
-from .paths import archive_dir, ensure_dirs, live_muse_path, live_rant_path, lock_path
+from .parsing import extract_urls
+from .paths import archive_dir, ensure_dirs, live_muse_path, lock_path
+from .runtime_status import save_runtime_status
+from .x_bridge import list_bookmarks
 
 
 @dataclass
@@ -53,188 +57,278 @@ def _trim(text: str, limit: int) -> str:
     return value[: limit - 3].rstrip() + "..."
 
 
-def _build_materials(inbox_text: str) -> tuple[list[dict[str, str]], list[str]]:
-    sources: list[dict[str, str]] = []
-    urls = extract_urls(inbox_text)
-    fetched_sources = fetch_many(urls, limit=8)
-    for source in fetched_sources:
-        sources.append(
-            {
-                "kind": "url",
-                "url": source.url,
-                "title": source.title,
-                "text": _trim(source.text, 5000),
-            }
-        )
-
-    cleaned_blocks = split_blocks(inbox_text)
-    for block in cleaned_blocks:
-        block_urls = extract_urls(block)
-        sources.append(
-            {
-                "kind": "inbox_block",
-                "url": block_urls[0] if block_urls else "",
-                "title": "Inbox block",
-                "text": _trim(block, 2500),
-            }
-        )
-    return sources, urls
+def _bookmark_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "status": {"type": "string"},
+            "recommended_reply": {"type": "string"},
+            "alternate_replies": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+            "why_it_works": {"type": "string"},
+            "skip_reason": {"type": "string"},
+        },
+        "required": [
+            "status",
+            "recommended_reply",
+            "alternate_replies",
+            "why_it_works",
+            "skip_reason",
+        ],
+    }
 
 
-def _system_prompt(reply_count: int) -> str:
+def _bookmark_system_prompt(reply_count: int) -> str:
     return (
-        "You turn rough rants into sharp, thoughtful reply drafts.\n"
+        "You prepare sharp reply options for one bookmarked X post.\n"
         "Return JSON only.\n"
-        "Use this shape:\n"
-        '{"replies":[{"source_url":"","source_excerpt":"","recommended_reply":"","alternate_replies":["","",""],"why_it_works":""}],"skipped":[{"item":"","reason":""}]}'
-        "\nRules:\n"
-        "- Use the user's pasted ideas and the target post text as the main input.\n"
-        "- Produce thoughtful, specific, non-cringe replies.\n"
-        "- The literary quality of the reply must be at least as strong as the source post and preferably stronger.\n"
-        "- If the source post is elegant, the reply cannot answer in flatter or clumsier prose.\n"
-        "- Prefer crisp, thought-provoking replies over longer explanatory paragraphs when both are defensible.\n"
-        "- Win with cleaner phrasing and sharper distinctions, not with extra length.\n"
-        "- Use dry wit or smart sarcasm when it sharpens the point, but do not drift into unserious snark.\n"
-        "- Prefer cleaner distinctions, stronger rhythm, and more exact language than the source material.\n"
-        "- Add judgment, tradeoffs, or consequences instead of paraphrasing the post.\n"
-        "- Avoid generic applause, vague agreement, and engagement bait.\n"
-        "- Replies should sound like a serious builder, not a corporate content bot.\n"
-        f"- Return at most {reply_count} replies per target.\n"
-        "- The user will post manually, so optimize for copy-paste quality.\n"
+        "status must be either `reply` or `skip`.\n"
+        "If the post is not worth replying to, set status to `skip` and explain briefly in skip_reason.\n"
+        "If status is `reply`, provide one recommended reply and several distinct alternates.\n"
+        "Rules:\n"
+        "- The reply must feel more precise, more literate, and more memorable than the source post.\n"
+        "- Prefer forceful compression over padded explanation.\n"
+        "- Use shipped experience, tradeoffs, scars, and real constraints where possible.\n"
+        "- Avoid generic agreement, applause, and canned inspiration.\n"
+        "- Keep each option short enough for a strong X reply.\n"
+        f"- Return at most {reply_count} total reply options.\n"
     )
 
 
-def _user_prompt(
+def _bookmark_user_prompt(
     *,
-    mode: str,
-    inbox_text: str,
-    sources: list[dict[str, str]],
+    bookmark: dict[str, Any],
     config: dict[str, Any],
 ) -> str:
     instruction_docs = load_generation_instruction_context(config)
+    materials: list[dict[str, str]] = [
+        {
+            "kind": "bookmarked_post",
+            "url": str(bookmark.get("url") or ""),
+            "title": "Bookmarked X post",
+            "text": _trim(str(bookmark.get("text") or ""), 2500),
+        }
+    ]
+    for source in fetch_many(extract_urls(str(bookmark.get("text") or "")), limit=4):
+        materials.append(
+            {
+                "kind": "linked_url",
+                "url": source.url,
+                "title": source.title,
+                "text": _trim(source.text, 4000),
+            }
+        )
     payload = {
-        "mode": mode,
         "workspace_instruction_context": [
             {"path": doc.path, "content": doc.content} for doc in instruction_docs
         ],
-        "inbox_text": inbox_text,
-        "materials": sources,
+        "bookmark": bookmark,
+        "materials": materials,
     }
-    return __import__("json").dumps(payload, indent=2)
+    return json.dumps(payload, indent=2)
 
 
-def _write_digest(
-    digest_path: Path,
-    *,
-    replies: list[dict[str, Any]],
-    skipped: list[dict[str, Any]],
-    errors: list[str],
-) -> None:
-    lines = ["# replyguy muse", ""]
-    lines.append("## reply ideas")
-    if replies:
-        for index, reply in enumerate(replies, start=1):
-            lines.extend(
-                [
-                    f"### muse {index}",
-                    f"- source_url: {reply.get('source_url') or '-'}",
-                    f"- why: {reply.get('why_it_works') or '-'}",
-                    "",
-                    _trim(str(reply.get("source_excerpt") or ""), 1200),
-                    "",
-                    "recommended:",
-                    str(reply.get("recommended_reply") or ""),
-                    "",
-                ]
-            )
-            for alt_index, alt in enumerate(reply.get("alternate_replies") or [], start=1):
-                if alt:
-                    lines.append(f"alt {alt_index}: {alt}")
-            lines.append("")
-    else:
-        lines.append("- no reply suggestions")
+def _write_bookmark_digest(digest_path: Path, items: list[dict[str, Any]]) -> None:
+    lines = ["# replyguy bookmark queue", ""]
+    pending = [item for item in items if str(item.get("status") or "pending") == "pending"]
+    lines.append(f"- pending: {len(pending)}")
+    lines.append("")
+    for index, item in enumerate(pending, start=1):
+        lines.extend(
+            [
+                f"## bookmark {index}",
+                f"- tweet_id: {item.get('tweet_id') or '-'}",
+                f"- author: @{item.get('author_username') or '-'}",
+                f"- url: {item.get('url') or '-'}",
+                "",
+                _trim(str(item.get("text") or ""), 800),
+                "",
+            ]
+        )
+        options = item.get("reply_options") or []
+        if options:
+            for option_index, option in enumerate(options, start=1):
+                lines.append(f"{option_index}. {option}")
+        else:
+            reason = item.get("generation_error") or item.get("skip_reason") or "no reply prepared"
+            lines.append(f"- {reason}")
         lines.append("")
-
-    lines.append("## skipped")
-    if skipped:
-        for item in skipped:
-            lines.append(f"- {item.get('item', 'item')}: {item.get('reason', 'skipped')}")
-    else:
-        lines.append("- none")
-    lines.append("")
-
-    lines.append("## failed")
-    if errors:
-        for error in errors:
-            lines.append(f"- {error}")
-    else:
-        lines.append("- none")
-    lines.append("")
     digest_path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def process_inbox(inbox_text: str, mode: str) -> ProcessResult:
+def _dedupe_replies(recommended: str, alternates: list[str], limit: int) -> list[str]:
+    seen: set[str] = set()
+    items: list[str] = []
+    for raw in [recommended] + list(alternates):
+        text = str(raw or "").strip()
+        if not text:
+            continue
+        key = text.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        items.append(text)
+        if len(items) >= limit:
+            break
+    return items
+
+
+def _draft_bookmark(
+    bookmark: dict[str, Any],
+    *,
+    responder: CodexResponder,
+    config: dict[str, Any],
+) -> dict[str, Any]:
+    reply_count = int(config.get("reply_count_per_target") or 4)
+    payload = responder.generate_json_with_schema(
+        _bookmark_schema(),
+        _bookmark_system_prompt(reply_count),
+        _bookmark_user_prompt(bookmark=bookmark, config=config),
+    )
+    status = str(payload.get("status") or "reply").strip().lower()
+    options = _dedupe_replies(
+        str(payload.get("recommended_reply") or ""),
+        [item for item in payload.get("alternate_replies") or [] if isinstance(item, str)],
+        reply_count,
+    )
+    item = dict(bookmark)
+    item["generated_at"] = now_iso()
+    item["why_it_works"] = str(payload.get("why_it_works") or "").strip()
+    item["skip_reason"] = str(payload.get("skip_reason") or "").strip()
+    item["reply_options"] = options if status == "reply" else []
+    item["status"] = "pending"
+    item["posted_reply_id"] = ""
+    item["bookmark_removed"] = False
+    item["generation_error"] = ""
+    return item
+
+
+def sync_bookmark_queue() -> ProcessResult:
     ensure_dirs()
     config = load_config()
-    reply_count = int(config.get("reply_count_per_target") or 4)
     responder = CodexResponder(config)
 
     with run_lock():
-        job_id = _job_id(mode)
+        job_id = _job_id("bookmark-sync")
         job_dir = _job_dir(job_id)
-        snapshot_path = job_dir / "rant.md"
         digest_path = job_dir / "muse.md"
-        snapshot_path.write_text(inbox_text, encoding="utf-8")
-        errors: list[str] = []
-
+        snapshot_path = job_dir / "bookmarks.json"
+        started_at = now_iso()
+        save_runtime_status(
+            {
+                "phase": "starting",
+                "running": True,
+                "job_id": job_id,
+                "started_at": started_at,
+                "current": 0,
+                "total": 0,
+                "current_tweet_id": "",
+                "last_error": "",
+            }
+        )
         try:
-            sources, _ = _build_materials(inbox_text)
-            payload = responder.generate_json(
-                _system_prompt(reply_count),
-                _user_prompt(
-                    mode=mode,
-                    inbox_text=inbox_text,
-                    sources=sources,
-                    config=config,
-                ),
-            )
+            existing_queue = load_queue()
+            existing_items = {
+                str(item.get("tweet_id") or ""): item
+                for item in existing_queue.get("items") or []
+                if isinstance(item, dict) and str(item.get("tweet_id") or "")
+            }
 
-            replies = [item for item in payload.get("replies") or [] if isinstance(item, dict)]
-            skipped = [item for item in payload.get("skipped") or [] if isinstance(item, dict)]
+            bookmarks = list_bookmarks(config, int(config.get("bookmark_sync_limit") or 100))
+            merged_items: list[dict[str, Any]] = []
+            total = len([bookmark for bookmark in bookmarks if str(bookmark.get("tweet_id") or "")])
+            current = 0
 
-            _write_digest(
-                digest_path,
-                replies=replies,
-                skipped=skipped,
-                errors=errors,
-            )
+            for bookmark in bookmarks:
+                tweet_id = str(bookmark.get("tweet_id") or "")
+                if not tweet_id:
+                    continue
+                current += 1
+                save_runtime_status(
+                    {
+                        "phase": "drafting",
+                        "running": True,
+                        "job_id": job_id,
+                        "started_at": started_at,
+                        "current": current,
+                        "total": total,
+                        "current_tweet_id": tweet_id,
+                        "last_error": "",
+                    }
+                )
+                existing = existing_items.get(tweet_id)
+                if existing and str(existing.get("status") or "pending") in {"pending", "posted"}:
+                    if str(existing.get("status") or "pending") == "pending" and not (existing.get("reply_options") or []):
+                        existing = None
+                    else:
+                        updated = dict(existing)
+                        updated.update(bookmark)
+                        merged_items.append(updated)
+                        continue
+                try:
+                    merged_items.append(_draft_bookmark(bookmark, responder=responder, config=config))
+                except Exception as exc:
+                    failed = dict(bookmark)
+                    failed["generated_at"] = now_iso()
+                    failed["reply_options"] = []
+                    failed["why_it_works"] = ""
+                    failed["skip_reason"] = ""
+                    failed["status"] = "pending"
+                    failed["posted_reply_id"] = ""
+                    failed["bookmark_removed"] = False
+                    failed["generation_error"] = str(exc)
+                    merged_items.append(failed)
+                    save_runtime_status(
+                        {
+                            "phase": "drafting",
+                            "running": True,
+                            "job_id": job_id,
+                            "started_at": started_at,
+                            "current": current,
+                            "total": total,
+                            "current_tweet_id": tweet_id,
+                            "last_error": str(exc),
+                        }
+                    )
+
+            queue = {
+                "synced_at": now_iso(),
+                "items": merged_items,
+            }
+            save_queue(queue)
+            snapshot_path.write_text(json.dumps(queue, indent=2) + "\n", encoding="utf-8")
+            _write_bookmark_digest(digest_path, merged_items)
             live_muse_path().write_text(digest_path.read_text(encoding="utf-8"), encoding="utf-8")
-            summary = f"replies={len(replies)}"
-            notify("replyguy", f"done: {summary}")
+            summary = f"bookmarks={len(merged_items)}"
+            notify("replyguy", f"inhale done: {summary}")
+            save_runtime_status(
+                {
+                    "phase": "done",
+                    "running": False,
+                    "job_id": job_id,
+                    "started_at": started_at,
+                    "current": current,
+                    "total": total,
+                    "current_tweet_id": "",
+                    "last_error": "",
+                }
+            )
             return ProcessResult(job_id=job_id, summary=summary, digest_path=digest_path)
         except Exception as exc:
-            errors.append(str(exc))
-            _write_digest(
-                digest_path,
-                replies=[],
-                skipped=[],
-                errors=errors,
+            save_runtime_status(
+                {
+                    "phase": "failed",
+                    "running": False,
+                    "job_id": job_id,
+                    "started_at": started_at,
+                    "current": 0,
+                    "total": 0,
+                    "current_tweet_id": "",
+                    "last_error": str(exc),
+                }
             )
-            live_muse_path().write_text(digest_path.read_text(encoding="utf-8"), encoding="utf-8")
-            notify("replyguy", f"failed: {exc}")
+            notify("replyguy", f"inhale failed: {exc}")
             raise
-
-
-def process_rant_file() -> ProcessResult | None:
-    rant_path = live_rant_path()
-    if not rant_path.exists():
-        rant_path.write_text(
-            "<!-- Paste the posts, URLs, snippets, and raw ideas you want turned into replies here. -->\n",
-            encoding="utf-8",
-        )
-    raw_text = rant_path.read_text(encoding="utf-8")
-    if not has_meaningful_text(raw_text):
-        return None
-    result = process_inbox(raw_text, "rant")
-    rant_path.write_text("", encoding="utf-8")
-    return result

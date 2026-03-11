@@ -1,18 +1,15 @@
 # replyguy Agent Guide
 
 ## Scope
-- `replyguy` is a terminal-native reply drafting tool that turns rough rants into usable muses.
+- `replyguy` is a terminal-native reply drafting tool for bookmarked X posts.
 - The product is keyboard-first, explicit, local-first, and inspectable. It is not a web dashboard.
-- Public repo, private runtime state: keep `rant`, `muse`, archives, and config in XDG paths outside the repo.
-- `replyguy` does not post anywhere. It only turns raw inputs into reply suggestions the user can copy-paste manually.
+- Public repo, private runtime state: keep `muse`, archives, and config in XDG paths outside the repo.
+- `replyguy` owns reply choice and review; the final send is manual through the browser with clipboard help.
 
 ## Product Rules
-- `replyguy rant` opens the live rant file in `$VISUAL`, then `$EDITOR`, then `vim`. Exiting the editor processes the file and writes reply suggestions.
-- `replyguy muse` opens the latest muse output file, then clears the live file after the editor closes.
-- `replyguy` must archive the consumed rant before clearing it.
-- Clear the live rant only after the muse file write succeeds.
-- If processing fails before the output is committed, leave the live rant intact.
-- `replyguy` suggests replies, but the user posts them manually.
+- `replyguy inhale` fetches bookmarked X posts through the `x` app and prepares replies in the background.
+- `replyguy exhale` walks the prepared bookmarked-post queue in the terminal, lets the user choose and edit a reply, opens the post in Google Chrome Stable, copies the reply to the clipboard with `wl-copy`, and removes the bookmark.
+- `replyguy status` reports whether inhale is currently running plus the queue state from local files.
 
 ## Content Rules
 - Keep the writing direct, technically grounded, and anti-sludge.

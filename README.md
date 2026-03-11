@@ -1,9 +1,9 @@
 # replyguy
 
-Vim-first CLI that turns one local rant into:
+Vim-first CLI that turns bookmarked X posts into:
 
 - reply-guy suggestions for other people's posts
-- an archived muse with reply options you can copy-paste manually
+- an archived bookmark queue with reply options you can review and post
 
 The repo can be public because all mutable runtime state stays outside the repo
 in XDG directories.
@@ -28,28 +28,34 @@ flags:
     upgrade to the latest release
 
 features:
-  open the rant file in your editor, then launch drafting in the background
-  # rant [<path_to_input_txt_or_md_file>]
-  replyguy rant
-  replyguy rant ~/tmp/ideas.txt
+  inhale bookmarked X posts into a prepared reply queue in the background
+  # inhale
+  replyguy inhale
 
-  open the latest muse output in your editor, then clear it on close
-  # muse
-  replyguy muse
+  exhale bookmarked X posts, choose a reply, do a final edit, post it, and remove the bookmark
+  # exhale
+  replyguy exhale
+
+  show whether inhale is running and what is queued
+  # status
+  replyguy status
 
   open the config in your editor
   # conf
   replyguy conf
 ```
 
-`replyguy rant` launches the work in the background and returns your terminal
-immediately. Completion or failure is reported through Mako via `notify-send`.
-`replyguy` does not publish to LinkedIn or X. It only drafts replies for manual
-posting.
+`replyguy inhale` asks the `x` app for bookmarked posts, prepares reply options in
+the background, and stores the queue under XDG state.
 
-`replyguy muse` opens the latest generated output and clears the live `muse`
-file after you close the editor. Archived per-run muses remain under the jobs
-directory.
+`replyguy exhale` walks that queue in the terminal, lets you pick an option,
+opens a final edit in your editor, opens the bookmarked post in Google Chrome
+Stable, copies the edited reply to the clipboard with `wl-copy`, and removes
+the bookmark. That leaves the final send as a manual paste in X.
+
+`replyguy status` shows whether an inhale job is currently running, the last
+inhale timestamp, pending count, posted-but-not-unbookmarked count, and the
+latest generation error if one exists.
 
 ## Config
 
@@ -71,6 +77,8 @@ The default config stores:
 - Codex reasoning effort
 - `codex_context_paths` for local docs that should be injected before drafting
 - reply count per target
+- bookmark inhale limit
+- optional `x_command` override if `replyguy` should call a non-default `x` binary
 
 `replyguy` uses the local `codex` CLI for generation, so you need to be logged in
 with `codex login`.
@@ -83,10 +91,16 @@ context for drafting.
 
 Runtime state lives outside the repo:
 
-- live rant and muse under `~/.local/state/replyguy/`
+- live muse under `~/.local/state/replyguy/`
 - job archives under `~/.local/state/replyguy/jobs/`
+- bookmark queue under `~/.local/state/replyguy/bookmark_queue.json`
 
 That local state is not committed and is not part of the public repo.
+
+## Runtime Requirements
+
+- `google-chrome-stable` for opening the bookmarked post during `exhale`
+- `wl-copy` for putting the selected reply on the clipboard
 
 ## Source Run
 

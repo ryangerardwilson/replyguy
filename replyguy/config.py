@@ -15,6 +15,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "/home/ryan/Documents/agent_context/REPLY_GUY_GUIDELINES.md",
     ],
     "reply_count_per_target": 4,
+    "bookmark_sync_limit": 100,
+    "x_command": "",
 }
 
 

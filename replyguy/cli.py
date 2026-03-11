@@ -14,14 +14,14 @@ from _version import __version__
 from .config import load_config
 from .editor import open_in_editor
 from .errors import ReplyGuyError
-from .paths import config_path, ensure_dirs, live_muse_path, live_rant_path
+from .paths import config_path, ensure_dirs
 
 ANSI_RESET = "\033[0m"
 ANSI_GRAY = "\033[38;5;245m"
 INSTALL_SCRIPT_URL = "https://raw.githubusercontent.com/ryangerardwilson/replyguy/main/install.sh"
 
 HELP_TEXT = """Replyguy CLI
-turn rants into muses you can copy-paste manually
+turn bookmarked X posts into replies you can post fast
 
 flags:
   replyguy -h
@@ -32,14 +32,17 @@ flags:
     upgrade to the latest release
 
 features:
-  open the rant file in your editor, then launch drafting in the background
-  # rant [<path_to_input_txt_or_md_file>]
-  replyguy rant
-  replyguy rant ~/tmp/ideas.txt
+  inhale bookmarked X posts into a prepared reply queue in the background
+  # inhale
+  replyguy inhale
 
-  open the latest muse output in your editor, then clear it on close
-  # muse
-  replyguy muse
+  exhale bookmarked X posts, choose a reply, do a final edit, post it, and remove the bookmark
+  # exhale
+  replyguy exhale
+
+  show whether inhale is running and what is queued
+  # status
+  replyguy status
 
   open the config in your editor
   # conf
@@ -100,59 +103,32 @@ def open_config() -> int:
     return open_in_editor(config_path())
 
 
-def open_rant(input_path: str | None = None) -> int:
+def open_exhale() -> int:
+    from .muse import run_muse_session
+
     ensure_dirs()
-    if input_path:
-        source_path = Path(input_path).expanduser()
-        if not source_path.exists() or not source_path.is_file():
-            raise ReplyGuyError(f"missing input file: {source_path}")
-        _spawn_background("_rant_file", str(source_path))
-        print(f"replyguy rant: started background job for {source_path}")
-    else:
-        rant_path = live_rant_path()
-        if not rant_path.exists():
-            rant_path.write_text(
-                "<!-- Paste the posts, URLs, snippets, and raw ideas you want turned into replies here. -->\n",
-                encoding="utf-8",
-            )
-        rc = open_in_editor(rant_path)
-        if rc != 0:
-            return rc
-        _spawn_background("_rant_live")
-        print("replyguy rant: started background job")
+    return run_muse_session()
+
+
+def inhale_bookmarks() -> int:
+    ensure_dirs()
+    _spawn_background("_inhale_bookmarks")
+    print("replyguy inhale: started background bookmark sync")
     return 0
 
 
-def open_muse() -> int:
-    ensure_dirs()
-    muse_path = live_muse_path()
-    if not muse_path.exists():
-        muse_path.write_text("# replyguy muse\n\n- no muse yet\n", encoding="utf-8")
-    rc = open_in_editor(muse_path)
-    muse_path.write_text("", encoding="utf-8")
-    return rc
+def process_inhale_bookmarks() -> int:
+    from .pipeline import sync_bookmark_queue
 
-
-def process_rant_live() -> int:
-    from .pipeline import process_rant_file
-
-    result = process_rant_file()
-    if result is None:
-        return 0
+    sync_bookmark_queue()
     return 0
 
 
-def process_rant_file_path(input_path: str) -> int:
-    from .pipeline import process_inbox
+def show_status() -> int:
+    from .status import render_status
 
-    source_path = Path(input_path).expanduser()
-    if not source_path.exists() or not source_path.is_file():
-        raise ReplyGuyError(f"missing input file: {source_path}")
-    try:
-        inbox_text = source_path.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise ReplyGuyError(f"failed to read input file `{source_path}`: {exc}") from exc
-    process_inbox(inbox_text, "rant")
+    ensure_dirs()
+    print(_muted_text(render_status()))
     return 0
 
 
@@ -201,24 +177,24 @@ def main(argv: list[str] | None = None) -> int:
         raise ReplyGuyError("`replyguy -u` cannot be combined with another action")
 
     command = parsed.command
-    if command == "rant":
-        if len(parsed.params) > 1:
-            raise ReplyGuyError("valid shape: `replyguy rant [<path_to_input_txt_or_md_file>]`")
-        return open_rant(parsed.params[0] if parsed.params else None)
-    if command == "muse":
+    if command == "exhale":
         if parsed.params:
-            raise ReplyGuyError("valid shape: `replyguy muse`")
-        return open_muse()
+            raise ReplyGuyError("valid shape: `replyguy exhale`")
+        return open_exhale()
+    if command == "inhale":
+        if parsed.params:
+            raise ReplyGuyError("valid shape: `replyguy inhale`")
+        return inhale_bookmarks()
     if command == "conf":
         if parsed.params:
             raise ReplyGuyError("valid shape: `replyguy conf`")
         return open_config()
-    if command == "_rant_live":
+    if command == "status":
         if parsed.params:
-            raise ReplyGuyError("valid shape: `replyguy _rant_live`")
-        return process_rant_live()
-    if command == "_rant_file":
-        if len(parsed.params) != 1:
-            raise ReplyGuyError("valid shape: `replyguy _rant_file <path>`")
-        return process_rant_file_path(parsed.params[0])
+            raise ReplyGuyError("valid shape: `replyguy status`")
+        return show_status()
+    if command == "_inhale_bookmarks":
+        if parsed.params:
+            raise ReplyGuyError("valid shape: `replyguy _inhale_bookmarks`")
+        return process_inhale_bookmarks()
     raise ReplyGuyError(f"unknown command: {command}")

@@ -11,7 +11,7 @@ def notify(title: str, body: str) -> None:
         [
             "notify-send",
             "-t",
-            "0",
+            "5000",
             title,
             body,
         ],

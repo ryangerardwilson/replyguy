@@ -1,6 +1,5 @@
 import unittest
 from io import StringIO
-from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
@@ -20,9 +19,12 @@ class ReplyGuyCliTests(unittest.TestCase):
         self.assertEqual(no_arg_output, help_output)
         self.assertIn("Replyguy CLI", help_output)
         self.assertIn("features:", help_output)
-        self.assertIn("replyguy rant", help_output)
-        self.assertIn("replyguy rant ~/tmp/ideas.txt", help_output)
-        self.assertIn("replyguy muse", help_output)
+        self.assertIn("replyguy inhale", help_output)
+        self.assertIn("replyguy exhale", help_output)
+        self.assertIn("replyguy status", help_output)
+        self.assertNotIn("replyguy rant", help_output)
+        self.assertNotIn("replyguy sync", help_output)
+        self.assertNotIn("replyguy muse", help_output)
         self.assertNotIn("commands:", help_output)
 
     def test_version_prints_single_value(self) -> None:
@@ -44,57 +46,29 @@ class ReplyGuyCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(subprocess_run.call_args.args[0][0], "nvim")
 
-    def test_rant_processes_and_clears_on_success(self) -> None:
-        with TemporaryDirectory() as tmp:
-            with patch.dict(
-                "os.environ",
-                {
-                    "XDG_CONFIG_HOME": f"{tmp}/config",
-                    "XDG_STATE_HOME": f"{tmp}/state",
-                    "XDG_CACHE_HOME": f"{tmp}/cache",
-                },
-                clear=False,
-            ):
-                rant_path = Path(tmp) / "state" / "replyguy" / "rant.md"
-                rant_path.parent.mkdir(parents=True, exist_ok=True)
-                rant_path.write_text("post about AI agents\n", encoding="utf-8")
-                with patch("replyguy.cli.open_in_editor", return_value=0):
-                    with patch("replyguy.cli._spawn_background") as spawn_background:
-                        code = main(["rant"])
-                self.assertEqual(code, 0)
-                spawn_background.assert_called_once_with("_rant_live")
-
-    def test_rant_with_input_path_skips_editor(self) -> None:
-        with TemporaryDirectory() as tmp:
-            input_path = Path(tmp) / "ideas.txt"
-            input_path.write_text("post about agents\n", encoding="utf-8")
-            with patch("replyguy.cli.open_in_editor") as open_in_editor_mock:
-                with patch("replyguy.cli._spawn_background") as spawn_background:
-                    code = main(["rant", str(input_path)])
+    def test_inhale_starts_background_job(self) -> None:
+        with patch("replyguy.cli._spawn_background") as spawn_background:
+            code = main(["inhale"])
         self.assertEqual(code, 0)
-        open_in_editor_mock.assert_not_called()
-        spawn_background.assert_called_once_with("_rant_file", str(input_path))
+        spawn_background.assert_called_once_with("_inhale_bookmarks")
 
-    def test_muse_clears_live_file_after_editor_closes(self) -> None:
-        with TemporaryDirectory() as tmp:
-            with patch.dict(
-                "os.environ",
-                {
-                    "XDG_STATE_HOME": f"{tmp}/state",
-                },
-                clear=False,
-            ):
-                muse_path = Path(tmp) / "state" / "replyguy" / "muse.md"
-                muse_path.parent.mkdir(parents=True, exist_ok=True)
-                muse_path.write_text("hello\n", encoding="utf-8")
-                with patch("replyguy.cli.open_in_editor", return_value=0):
-                    code = main(["muse"])
-                self.assertEqual(muse_path.read_text(encoding="utf-8"), "")
+    def test_exhale_runs_interactive_session(self) -> None:
+        with patch("replyguy.muse.run_muse_session", return_value=0) as run_session:
+            code = main(["exhale"])
         self.assertEqual(code, 0)
+        run_session.assert_called_once_with()
+
+    def test_status_prints_rendered_status(self) -> None:
+        with patch("replyguy.status.render_status", return_value="replyguy status\n") as render_status:
+            with patch("sys.stdout", new=StringIO()) as stdout:
+                code = main(["status"])
+        self.assertEqual(code, 0)
+        render_status.assert_called_once_with()
+        self.assertEqual(stdout.getvalue(), "replyguy status\n\n")
 
     def test_build_runtime_command_uses_launcher_only_when_frozen(self) -> None:
         with patch("sys.executable", "/tmp/replyguy"), patch("sys.frozen", True, create=True):
-            self.assertEqual(_build_runtime_command("_rant_live"), "/tmp/replyguy _rant_live")
+            self.assertEqual(_build_runtime_command("_inhale_bookmarks"), "/tmp/replyguy _inhale_bookmarks")
 
     def test_upgrade_delegates_to_installer_upgrade_mode(self) -> None:
         fake_response = type("Response", (), {"read": lambda self: b"#!/usr/bin/env bash\n"})()

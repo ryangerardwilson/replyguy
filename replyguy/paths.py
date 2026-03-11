@@ -29,12 +29,16 @@ def config_path() -> Path:
     return config_dir() / "config.json"
 
 
-def live_rant_path() -> Path:
-    return state_dir() / "rant.md"
-
-
 def live_muse_path() -> Path:
     return state_dir() / "muse.md"
+
+
+def bookmark_queue_path() -> Path:
+    return state_dir() / "bookmark_queue.json"
+
+
+def runtime_status_path() -> Path:
+    return state_dir() / "runtime_status.json"
 
 
 def archive_dir() -> Path:

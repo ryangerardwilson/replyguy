@@ -16,50 +16,12 @@ class CodexResponder:
         self._model = str(config.get("codex_model") or "gpt-5-codex")
         self._reasoning_effort = str(config.get("codex_reasoning_effort") or "high")
 
-    def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, Any]:
-        schema = {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "replies": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "properties": {
-                            "source_url": {"type": "string"},
-                            "source_excerpt": {"type": "string"},
-                            "recommended_reply": {"type": "string"},
-                            "alternate_replies": {
-                                "type": "array",
-                                "items": {"type": "string"},
-                            },
-                            "why_it_works": {"type": "string"},
-                        },
-                        "required": [
-                            "source_url",
-                            "source_excerpt",
-                            "recommended_reply",
-                            "alternate_replies",
-                            "why_it_works",
-                        ],
-                    },
-                },
-                "skipped": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "properties": {
-                            "item": {"type": "string"},
-                            "reason": {"type": "string"},
-                        },
-                        "required": ["item", "reason"],
-                    },
-                },
-            },
-            "required": ["replies", "skipped"],
-        }
+    def generate_json_with_schema(
+        self,
+        schema: dict[str, Any],
+        system_prompt: str,
+        user_prompt: str,
+    ) -> dict[str, Any]:
         prompt = (
             f"{system_prompt}\n\n"
             "Return only the final JSON object that matches the provided schema.\n\n"
@@ -105,3 +67,49 @@ class CodexResponder:
             if not isinstance(parsed, dict):
                 raise ReplyGuyError("codex exec output was not a JSON object")
             return parsed
+
+    def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, Any]:
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "replies": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "source_url": {"type": "string"},
+                            "source_excerpt": {"type": "string"},
+                            "recommended_reply": {"type": "string"},
+                            "alternate_replies": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                            "why_it_works": {"type": "string"},
+                        },
+                        "required": [
+                            "source_url",
+                            "source_excerpt",
+                            "recommended_reply",
+                            "alternate_replies",
+                            "why_it_works",
+                        ],
+                    },
+                },
+                "skipped": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "item": {"type": "string"},
+                            "reason": {"type": "string"},
+                        },
+                        "required": ["item", "reason"],
+                    },
+                },
+            },
+            "required": ["replies", "skipped"],
+        }
+        return self.generate_json_with_schema(schema, system_prompt, user_prompt)

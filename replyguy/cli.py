@@ -107,6 +107,29 @@ def _replyguy_unit_name() -> str:
     return "replyguy"
 
 
+def _timer_environment_lines() -> list[str]:
+    names = sorted(
+        {
+            name
+            for name in os.environ
+            if name.startswith("X_") or name.startswith("TWITTER_")
+        }
+        | {
+            name
+            for name in ("XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME")
+            if os.environ.get(name)
+        }
+    )
+    lines: list[str] = []
+    for name in names:
+        value = os.environ.get(name)
+        if not value:
+            continue
+        escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+        lines.append(f'Environment="{name}={escaped}"')
+    return lines
+
+
 def _write_timer_units() -> None:
     systemd_dir = Path.home() / ".config" / "systemd" / "user"
     systemd_dir.mkdir(parents=True, exist_ok=True)
@@ -115,6 +138,7 @@ def _write_timer_units() -> None:
     entrypoint = Path(__file__).resolve().parents[1] / "main.py"
     run_command = _build_runtime_command("_inhale_bookmarks")
     runtime_path = os.environ.get("PATH") or "/usr/local/bin:/usr/bin:/bin"
+    environment_lines = _timer_environment_lines()
     service_body = "\n".join(
         [
             "[Unit]",
@@ -124,6 +148,7 @@ def _write_timer_units() -> None:
             "Type=oneshot",
             f"WorkingDirectory={entrypoint.parent}",
             f"Environment=PATH={runtime_path}",
+            *environment_lines,
             f"ExecStart=/usr/bin/env bash -lc {shlex.quote(run_command)}",
             "",
         ]

@@ -1,9 +1,10 @@
 import unittest
 from io import StringIO
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from replyguy.cli import _build_runtime_command, main
+from replyguy.cli import _build_runtime_command, _write_timer_units, main
 
 
 class ReplyGuyCliTests(unittest.TestCase):
@@ -91,6 +92,24 @@ class ReplyGuyCliTests(unittest.TestCase):
     def test_build_runtime_command_uses_launcher_only_when_frozen(self) -> None:
         with patch("sys.executable", "/tmp/replyguy"), patch("sys.frozen", True, create=True):
             self.assertEqual(_build_runtime_command("_inhale_bookmarks"), "/tmp/replyguy _inhale_bookmarks")
+
+    def test_write_timer_units_carries_x_auth_environment(self) -> None:
+        with TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            env = {
+                "X_CLIENT_ID": "client-id",
+                "X_CLIENT_SECRET": 'secret"value',
+                "XDG_DATA_HOME": "/tmp/data-home",
+            }
+            with patch("pathlib.Path.home", return_value=home), patch.dict("os.environ", env, clear=False):
+                _write_timer_units()
+            service_path = home / ".config" / "systemd" / "user" / "replyguy.service"
+            service_body = service_path.read_text(encoding="utf-8")
+
+        self.assertIn('Environment="X_CLIENT_ID=client-id"', service_body)
+        self.assertIn('Environment="X_CLIENT_SECRET=secret\\"value"', service_body)
+        self.assertIn('Environment="XDG_DATA_HOME=/tmp/data-home"', service_body)
+        self.assertIn("main.py _inhale_bookmarks", service_body)
 
     def test_upgrade_delegates_to_installer_upgrade_mode(self) -> None:
         fake_response = type("Response", (), {"read": lambda self: b"#!/usr/bin/env bash\n"})()

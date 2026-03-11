@@ -246,6 +246,7 @@ def sync_bookmark_queue() -> ProcessResult:
                 "last_error": "",
             }
         )
+        notify("replyguy", "inhale started")
         try:
             existing_queue = load_queue()
             existing_items = {

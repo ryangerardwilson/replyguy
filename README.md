@@ -32,6 +32,12 @@ features:
   # inhale
   replyguy inhale
 
+  run inhale hourly in the background, disable it, or inspect the timer
+  # ti | td | st
+  replyguy ti
+  replyguy td
+  replyguy st
+
   exhale bookmarked X posts, choose a reply, do a final edit, post it, and remove the bookmark
   # exhale
   replyguy exhale
@@ -46,7 +52,12 @@ features:
 ```
 
 `replyguy inhale` asks the `x` app for bookmarked posts, prepares reply options in
-the background, and stores the queue under XDG state.
+the background, stores the queue under XDG state, and sends one notification per
+processed bookmark.
+
+`replyguy ti` installs an hourly user timer through systemd so inhale keeps
+running while you keep bookmarking posts. `replyguy td` disables that timer.
+`replyguy st` shows the timer status through `systemctl --user`.
 
 `replyguy exhale` walks that queue in the terminal, lets you pick an option,
 opens a final edit in your editor, opens the bookmarked post in Google Chrome
@@ -101,6 +112,7 @@ That local state is not committed and is not part of the public repo.
 
 - `google-chrome-stable` for opening the bookmarked post during `exhale`
 - `wl-copy` for putting the selected reply on the clipboard
+- `systemd --user` if you want the hourly inhale timer via `replyguy ti`
 
 ## Source Run
 

@@ -36,6 +36,12 @@ features:
   # inhale
   replyguy inhale
 
+  run inhale hourly in the background, disable it, or inspect the timer
+  # ti | td | st
+  replyguy ti
+  replyguy td
+  replyguy st
+
   exhale bookmarked X posts, choose a reply, do a final edit, post it, and remove the bookmark
   # exhale
   replyguy exhale
@@ -97,6 +103,57 @@ def _spawn_background(*args: str) -> None:
     )
 
 
+def _replyguy_unit_name() -> str:
+    return "replyguy"
+
+
+def _write_timer_units() -> None:
+    systemd_dir = Path.home() / ".config" / "systemd" / "user"
+    systemd_dir.mkdir(parents=True, exist_ok=True)
+    service_path = systemd_dir / f"{_replyguy_unit_name()}.service"
+    timer_path = systemd_dir / f"{_replyguy_unit_name()}.timer"
+    entrypoint = Path(__file__).resolve().parents[1] / "main.py"
+    run_command = _build_runtime_command("_inhale_bookmarks")
+    service_body = "\n".join(
+        [
+            "[Unit]",
+            "Description=replyguy inhale bookmarked posts",
+            "",
+            "[Service]",
+            "Type=oneshot",
+            f"WorkingDirectory={entrypoint.parent}",
+            f"ExecStart=/usr/bin/env bash -lc {shlex.quote(run_command)}",
+            "",
+        ]
+    )
+    timer_body = "\n".join(
+        [
+            "[Unit]",
+            "Description=Run replyguy inhale hourly",
+            "",
+            "[Timer]",
+            "OnBootSec=5m",
+            "OnUnitActiveSec=1h",
+            "Persistent=true",
+            "",
+            "[Install]",
+            "WantedBy=timers.target",
+            "",
+        ]
+    )
+    service_path.write_text(service_body, encoding="utf-8")
+    timer_path.write_text(timer_body, encoding="utf-8")
+
+
+def _systemctl_user(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["systemctl", "--user", *args],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+
+
 def open_config() -> int:
     ensure_dirs()
     load_config()
@@ -121,6 +178,27 @@ def process_inhale_bookmarks() -> int:
     from .pipeline import sync_bookmark_queue
 
     sync_bookmark_queue()
+    return 0
+
+
+def install_timer() -> int:
+    _write_timer_units()
+    _systemctl_user("daemon-reload")
+    _systemctl_user("enable", "--now", f"{_replyguy_unit_name()}.timer")
+    print(f"timer enabled: {_replyguy_unit_name()}.timer")
+    return 0
+
+
+def disable_timer() -> int:
+    _write_timer_units()
+    _systemctl_user("disable", "--now", f"{_replyguy_unit_name()}.timer")
+    print(f"timer disabled: {_replyguy_unit_name()}.timer")
+    return 0
+
+
+def timer_status() -> int:
+    result = _systemctl_user("status", f"{_replyguy_unit_name()}.timer")
+    print(result.stdout.strip())
     return 0
 
 
@@ -193,6 +271,18 @@ def main(argv: list[str] | None = None) -> int:
         if parsed.params:
             raise ReplyGuyError("valid shape: `replyguy status`")
         return show_status()
+    if command == "ti":
+        if parsed.params:
+            raise ReplyGuyError("valid shape: `replyguy ti`")
+        return install_timer()
+    if command == "td":
+        if parsed.params:
+            raise ReplyGuyError("valid shape: `replyguy td`")
+        return disable_timer()
+    if command == "st":
+        if parsed.params:
+            raise ReplyGuyError("valid shape: `replyguy st`")
+        return timer_status()
     if command == "_inhale_bookmarks":
         if parsed.params:
             raise ReplyGuyError("valid shape: `replyguy _inhale_bookmarks`")

@@ -8,6 +8,7 @@
 
 ## Product Rules
 - `replyguy inhale` fetches bookmarked X posts through the `x` app and prepares replies in the background.
+- `replyguy ti` installs an hourly user timer that runs the direct inhale worker. `td` disables it and `st` shows timer status.
 - `replyguy exhale` walks the prepared bookmarked-post queue in the terminal, lets the user choose and edit a reply, opens the post in Google Chrome Stable, copies the reply to the clipboard with `wl-copy`, and removes the bookmark.
 - `replyguy status` reports whether inhale is currently running plus the queue state from local files.
 

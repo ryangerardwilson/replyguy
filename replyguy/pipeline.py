@@ -206,6 +206,18 @@ def _draft_bookmark(
     return item
 
 
+def _notify_processed_bookmark(bookmark: dict[str, Any], item: dict[str, Any], current: int, total: int) -> None:
+    username = str(bookmark.get("author_username") or "").strip() or "unknown"
+    tweet_id = str(bookmark.get("tweet_id") or "").strip() or "-"
+    options = item.get("reply_options") or []
+    if options:
+        body = f"{current}/{total} @{username} replies={len(options)} id={tweet_id}"
+    else:
+        reason = str(item.get("generation_error") or item.get("skip_reason") or "no reply prepared").strip()
+        body = f"{current}/{total} @{username} skipped id={tweet_id} {reason}"
+    notify("replyguy", body[:220])
+
+
 def sync_bookmark_queue() -> ProcessResult:
     ensure_dirs()
     config = load_config()
@@ -269,7 +281,9 @@ def sync_bookmark_queue() -> ProcessResult:
                         merged_items.append(updated)
                         continue
                 try:
-                    merged_items.append(_draft_bookmark(bookmark, responder=responder, config=config))
+                    drafted = _draft_bookmark(bookmark, responder=responder, config=config)
+                    merged_items.append(drafted)
+                    _notify_processed_bookmark(bookmark, drafted, current, total)
                 except Exception as exc:
                     failed = dict(bookmark)
                     failed["generated_at"] = now_iso()
@@ -281,6 +295,7 @@ def sync_bookmark_queue() -> ProcessResult:
                     failed["bookmark_removed"] = False
                     failed["generation_error"] = str(exc)
                     merged_items.append(failed)
+                    _notify_processed_bookmark(bookmark, failed, current, total)
                     save_runtime_status(
                         {
                             "phase": "drafting",

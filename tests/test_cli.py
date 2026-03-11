@@ -20,6 +20,9 @@ class ReplyGuyCliTests(unittest.TestCase):
         self.assertIn("Replyguy CLI", help_output)
         self.assertIn("features:", help_output)
         self.assertIn("replyguy inhale", help_output)
+        self.assertIn("replyguy ti", help_output)
+        self.assertIn("replyguy td", help_output)
+        self.assertIn("replyguy st", help_output)
         self.assertIn("replyguy exhale", help_output)
         self.assertIn("replyguy status", help_output)
         self.assertNotIn("replyguy rant", help_output)
@@ -65,6 +68,25 @@ class ReplyGuyCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         render_status.assert_called_once_with()
         self.assertEqual(stdout.getvalue(), "replyguy status\n\n")
+
+    def test_ti_installs_timer(self) -> None:
+        with patch("replyguy.cli._write_timer_units") as write_units, patch(
+            "replyguy.cli._systemctl_user"
+        ) as systemctl:
+            code = main(["ti"])
+        self.assertEqual(code, 0)
+        write_units.assert_called_once_with()
+        systemctl.assert_any_call("daemon-reload")
+        systemctl.assert_any_call("enable", "--now", "replyguy.timer")
+
+    def test_td_disables_timer(self) -> None:
+        with patch("replyguy.cli._write_timer_units") as write_units, patch(
+            "replyguy.cli._systemctl_user"
+        ) as systemctl:
+            code = main(["td"])
+        self.assertEqual(code, 0)
+        write_units.assert_called_once_with()
+        systemctl.assert_called_with("disable", "--now", "replyguy.timer")
 
     def test_build_runtime_command_uses_launcher_only_when_frozen(self) -> None:
         with patch("sys.executable", "/tmp/replyguy"), patch("sys.frozen", True, create=True):

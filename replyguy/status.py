@@ -66,11 +66,19 @@ def render_status() -> str:
     ]
     latest_job = _latest_job_dir()
     latest_job_value = latest_job.name if latest_job is not None else "-"
+    runtime_error = str(runtime.get("last_error") or "").strip()
+    inhale_running = _is_inhale_running()
+    if runtime_error:
+        latest_error_value = runtime_error
+    elif inhale_running:
+        latest_error_value = "-"
+    else:
+        latest_error_value = _latest_error(items)
 
     lines = [
         "replyguy status",
         "",
-        f"running      : {'yes' if _is_inhale_running() else 'no'}",
+        f"running      : {'yes' if inhale_running else 'no'}",
         f"phase        : {str(runtime.get('phase') or '-')}",
         f"job_id       : {str(runtime.get('job_id') or '-')}",
         f"last_inhale  : {str(queue.get('synced_at') or '-')}",
@@ -80,6 +88,6 @@ def render_status() -> str:
         f"posted_wait  : {len(posted_waiting)}",
         f"tracked      : {len(items)}",
         f"latest_job   : {latest_job_value}",
-        f"latest_error : {str(runtime.get('last_error') or _latest_error(items) or '-')}",
+        f"latest_error : {latest_error_value}",
     ]
     return "\n".join(lines)

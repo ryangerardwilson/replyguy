@@ -124,6 +124,10 @@ else
   extract_source "${tmp_dir}/${APP}.tar.gz" "${APP_DIR}/source"
 fi
 
+if [[ -n "$requested_version" && -f "${APP_DIR}/source/_version.py" ]]; then
+  printf '__version__ = "%s"\n' "$requested_version" > "${APP_DIR}/source/_version.py"
+fi
+
 python3 -m venv "$VENV_DIR"
 "${VENV_DIR}/bin/pip" install --upgrade pip >/dev/null
 "${VENV_DIR}/bin/pip" install -r "${APP_DIR}/source/requirements.txt" >/dev/null

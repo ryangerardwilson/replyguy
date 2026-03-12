@@ -228,7 +228,6 @@ def sync_bookmark_queue() -> ProcessResult:
                 "last_error": "",
             }
         )
-        notify("replyguy", "inhale started")
         try:
             existing_queue = load_queue()
             existing_items = {
@@ -241,6 +240,32 @@ def sync_bookmark_queue() -> ProcessResult:
             merged_items: list[dict[str, Any]] = []
             total = len([bookmark for bookmark in bookmarks if str(bookmark.get("tweet_id") or "")])
             current = 0
+            if total == 0:
+                queue = {
+                    "synced_at": now_iso(),
+                    "items": merged_items,
+                }
+                save_queue(queue)
+                snapshot_path.write_text(json.dumps(queue, indent=2) + "\n", encoding="utf-8")
+                _write_bookmark_digest(digest_path, merged_items)
+                live_muse_path().write_text(digest_path.read_text(encoding="utf-8"), encoding="utf-8")
+                summary = "bookmarks=0"
+                notify("replyguy", "nothing to inhale")
+                save_runtime_status(
+                    {
+                        "phase": "done",
+                        "running": False,
+                        "job_id": job_id,
+                        "started_at": started_at,
+                        "current": 0,
+                        "total": 0,
+                        "current_tweet_id": "",
+                        "last_error": "",
+                    }
+                )
+                return ProcessResult(job_id=job_id, summary=summary, digest_path=digest_path)
+
+            notify("replyguy", "inhale started")
 
             for bookmark in bookmarks:
                 tweet_id = str(bookmark.get("tweet_id") or "")

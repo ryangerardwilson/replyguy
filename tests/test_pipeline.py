@@ -7,7 +7,7 @@ from replyguy.pipeline import sync_bookmark_queue
 
 
 class ReplyGuyPipelineTests(unittest.TestCase):
-    def test_sync_notifies_when_inhale_starts_and_finishes(self) -> None:
+    def test_sync_notifies_when_nothing_to_inhale(self) -> None:
         with TemporaryDirectory() as tmp:
             env = {
                 "XDG_CONFIG_HOME": str(Path(tmp) / "config"),
@@ -22,8 +22,7 @@ class ReplyGuyPipelineTests(unittest.TestCase):
                                 result = sync_bookmark_queue()
 
         self.assertEqual(result.summary, "bookmarks=0")
-        self.assertEqual(notify.call_args_list[0].args, ("replyguy", "inhale started"))
-        self.assertEqual(notify.call_args_list[-1].args, ("replyguy", "inhale done: bookmarks=0"))
+        self.assertEqual([call.args for call in notify.call_args_list], [("replyguy", "nothing to inhale")])
 
     def test_sync_does_not_notify_for_each_processed_bookmark(self) -> None:
         bookmarks = [

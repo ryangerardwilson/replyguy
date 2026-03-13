@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import load_config
-from .bookmark_queue import load_queue, now_iso, save_queue
+from .bookmark_queue import active_items, load_queue, now_iso, save_queue
 from .codex_client import CodexResponder
 from .fetch import fetch_many
 from .instruction_context import load_generation_instruction_context
@@ -176,6 +176,10 @@ def _dedupe_replies(recommended: str, alternates: list[str], limit: int) -> list
     return items
 
 
+def _pending_count(items: list[dict[str, Any]]) -> int:
+    return len([item for item in items if str(item.get("status") or "pending") == "pending"])
+
+
 def _draft_bookmark(
     bookmark: dict[str, Any],
     *,
@@ -230,9 +234,10 @@ def sync_bookmark_queue() -> ProcessResult:
         )
         try:
             existing_queue = load_queue()
+            existing_active = active_items(existing_queue)
             existing_items = {
                 str(item.get("tweet_id") or ""): item
-                for item in existing_queue.get("items") or []
+                for item in existing_active
                 if isinstance(item, dict) and str(item.get("tweet_id") or "")
             }
 
@@ -243,14 +248,18 @@ def sync_bookmark_queue() -> ProcessResult:
             if total == 0:
                 queue = {
                     "synced_at": now_iso(),
-                    "items": merged_items,
+                    "items": existing_active,
                 }
                 save_queue(queue)
                 snapshot_path.write_text(json.dumps(queue, indent=2) + "\n", encoding="utf-8")
-                _write_bookmark_digest(digest_path, merged_items)
+                _write_bookmark_digest(digest_path, existing_active)
                 live_muse_path().write_text(digest_path.read_text(encoding="utf-8"), encoding="utf-8")
                 summary = "bookmarks=0"
-                notify("replyguy", "nothing to inhale")
+                awaiting_exhale = _pending_count(existing_active)
+                if awaiting_exhale > 0:
+                    notify("replyguy", f"nothing left to inhale, {awaiting_exhale} awaiting exhale")
+                else:
+                    notify("replyguy", "nothing to inhale")
                 save_runtime_status(
                     {
                         "phase": "done",
@@ -266,6 +275,7 @@ def sync_bookmark_queue() -> ProcessResult:
                 return ProcessResult(job_id=job_id, summary=summary, digest_path=digest_path)
 
             notify("replyguy", "inhale started")
+            new_inhaled = 0
 
             for bookmark in bookmarks:
                 tweet_id = str(bookmark.get("tweet_id") or "")
@@ -296,6 +306,7 @@ def sync_bookmark_queue() -> ProcessResult:
                 try:
                     drafted = _draft_bookmark(bookmark, responder=responder, config=config)
                     merged_items.append(drafted)
+                    new_inhaled += 1
                 except Exception as exc:
                     failed = dict(bookmark)
                     failed["generated_at"] = now_iso()
@@ -307,6 +318,7 @@ def sync_bookmark_queue() -> ProcessResult:
                     failed["bookmark_removed"] = False
                     failed["generation_error"] = str(exc)
                     merged_items.append(failed)
+                    new_inhaled += 1
                     save_runtime_status(
                         {
                             "phase": "drafting",
@@ -329,7 +341,11 @@ def sync_bookmark_queue() -> ProcessResult:
             _write_bookmark_digest(digest_path, merged_items)
             live_muse_path().write_text(digest_path.read_text(encoding="utf-8"), encoding="utf-8")
             summary = f"bookmarks={len(merged_items)}"
-            notify("replyguy", f"inhale done: {summary}")
+            awaiting_exhale = _pending_count(merged_items)
+            if new_inhaled == 0:
+                notify("replyguy", f"nothing left to inhale, {awaiting_exhale} awaiting exhale")
+            else:
+                notify("replyguy", f"inhale done: {new_inhaled} new, {awaiting_exhale} awaiting exhale")
             save_runtime_status(
                 {
                     "phase": "done",

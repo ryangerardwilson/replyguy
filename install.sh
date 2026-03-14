@@ -6,7 +6,9 @@ REPO="ryangerardwilson/${APP}"
 APP_HOME="${HOME}/.${APP}"
 INSTALL_DIR="${APP_HOME}/bin"
 APP_DIR="${APP_HOME}/app"
+SOURCE_DIR="${APP_DIR}/source"
 VENV_DIR="${APP_HOME}/venv"
+FILENAME="${APP}.tar.gz"
 
 usage() {
   cat <<EOF
@@ -15,13 +17,18 @@ ${APP} Installer
 Usage: install.sh [options]
 
 Options:
-  -h, --help              Display this help message
-  -v                      Print the latest release version
-  -v <version>            Install a specific version
-  -u, --upgrade           Upgrade to the latest release
-  -b, --binary <path>     Install from a local checkout or tarball path
-      --no-modify-path    Don't modify shell config files
+  -h                         Show this help and exit
+  -v [<version>]             Install a specific release (e.g. 0.1.0 or v0.1.0)
+                             Without an argument, print the latest release version and exit
+  -u                         Upgrade to the latest release only when newer
+  -b, --binary <path>        Install from a local checkout or release bundle
+      --no-modify-path       Skip editing shell rc files
 EOF
+}
+
+die() {
+  echo "install.sh: $*" >&2
+  exit 1
 }
 
 requested_version=""
@@ -29,6 +36,7 @@ show_latest=false
 upgrade=false
 binary_path=""
 no_modify_path=false
+latest_version_cache=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -36,7 +44,7 @@ while [[ $# -gt 0 ]]; do
       usage
       exit 0
       ;;
-    -v|--version)
+    -v)
       if [[ -n "${2:-}" && "${2:0:1}" != "-" ]]; then
         requested_version="${2#v}"
         shift 2
@@ -50,40 +58,87 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     -b|--binary)
-      [[ -n "${2:-}" ]] || { echo "install.sh: -b requires a path" >&2; exit 1; }
+      [[ -n "${2:-}" ]] || die "-b/--binary requires a path"
       binary_path="$2"
       shift 2
+      ;;
+    --version)
+      if [[ -n "${2:-}" && "${2:0:1}" != "-" ]]; then
+        requested_version="${2#v}"
+        shift 2
+      else
+        show_latest=true
+        shift
+      fi
       ;;
     --no-modify-path)
       no_modify_path=true
       shift
       ;;
     *)
-      echo "install.sh: unknown option: $1" >&2
-      exit 1
+      die "unknown option: $1"
       ;;
   esac
 done
 
-if $upgrade && [[ -n "$requested_version" || -n "$binary_path" ]]; then
-  echo "install.sh: -u cannot be combined with -v <version> or -b" >&2
-  exit 1
-fi
-
 get_latest_version() {
-  curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
-    | sed -n 's/.*"tag_name": *"v\{0,1\}\([^"]*\)".*/\1/p'
+  command -v curl >/dev/null 2>&1 || die "'curl' is required"
+  if [[ -z "$latest_version_cache" ]]; then
+    latest_version_cache="$(
+      curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
+        | sed -n 's/.*"tag_name": *"v\{0,1\}\([^"]*\)".*/\1/p'
+    )"
+    [[ -n "$latest_version_cache" ]] || die "unable to determine latest release"
+  fi
+  printf '%s\n' "$latest_version_cache"
+}
+
+extract_source() {
+  local src_path="$1"
+  local out_dir="$2"
+
+  rm -rf "$out_dir"
+  mkdir -p "$out_dir"
+
+  if [[ -d "$src_path" ]]; then
+    cp -R "$src_path"/. "$out_dir"/
+    return 0
+  fi
+
+  tar -xzf "$src_path" -C "$tmp_dir"
+  local extracted
+  extracted="$(find "$tmp_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+  [[ -n "$extracted" ]] || die "failed to extract source archive"
+  cp -R "$extracted"/. "$out_dir"/
+}
+
+add_to_path() {
+  local config_file="$1"
+  local command="$2"
+
+  if grep -Fxq "$command" "$config_file" 2>/dev/null; then
+    return 0
+  fi
+  {
+    echo ""
+    echo "# ${APP}"
+    echo "$command"
+  } >> "$config_file"
 }
 
 if $show_latest; then
+  [[ "$upgrade" == false && -z "$binary_path" && -z "$requested_version" ]] || \
+    die "-v (no arg) cannot be combined with other options"
   get_latest_version
   exit 0
 fi
 
 if $upgrade; then
+  [[ -z "$binary_path" ]] || die "-u cannot be used with -b/--binary"
+  [[ -z "$requested_version" ]] || die "-u cannot be combined with -v <version>"
   latest="$(get_latest_version)"
-  if command -v "${APP}" >/dev/null 2>&1; then
-    installed="$(${APP} -v 2>/dev/null || true)"
+  if command -v "$APP" >/dev/null 2>&1; then
+    installed="$("$APP" -v 2>/dev/null || true)"
     installed="${installed#v}"
     if [[ -n "$installed" && "$installed" == "$latest" ]]; then
       exit 0
@@ -96,61 +151,45 @@ if [[ -z "$binary_path" && -z "$requested_version" ]]; then
   requested_version="$(get_latest_version)"
 fi
 
+command -v curl >/dev/null 2>&1 || die "'curl' is required"
+command -v tar >/dev/null 2>&1 || die "'tar' is required"
+command -v python3 >/dev/null 2>&1 || die "'python3' is required"
+
 mkdir -p "$INSTALL_DIR" "$APP_DIR"
-tmp_dir="$(mktemp -d)"
+tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/${APP}.XXXXXX")"
 trap 'rm -rf "$tmp_dir"' EXIT
 
-extract_source() {
-  local src_path="$1"
-  local out_dir="$2"
-  rm -rf "$out_dir"
-  mkdir -p "$out_dir"
-  if [[ -d "$src_path" ]]; then
-    cp -R "$src_path"/. "$out_dir"/
-    return 0
-  fi
-  tar -xzf "$src_path" -C "$tmp_dir"
-  local extracted
-  extracted="$(find "$tmp_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
-  [[ -n "$extracted" ]] || { echo "install.sh: failed to extract source archive" >&2; exit 1; }
-  cp -R "$extracted"/. "$out_dir"/
-}
-
 if [[ -n "$binary_path" ]]; then
-  extract_source "$binary_path" "${APP_DIR}/source"
+  [[ -e "$binary_path" ]] || die "bundle not found: $binary_path"
+  extract_source "$binary_path" "$SOURCE_DIR"
 else
-  archive_url="https://github.com/${REPO}/archive/refs/tags/v${requested_version}.tar.gz"
-  curl -fsSL "$archive_url" -o "${tmp_dir}/${APP}.tar.gz"
-  extract_source "${tmp_dir}/${APP}.tar.gz" "${APP_DIR}/source"
+  requested_version="${requested_version#v}"
+  url="https://github.com/${REPO}/releases/download/v${requested_version}/${FILENAME}"
+  http_status="$(curl -sI -o /dev/null -w "%{http_code}" "https://github.com/${REPO}/releases/tag/v${requested_version}")"
+  [[ "$http_status" != "404" ]] || die "release v${requested_version} not found"
+  curl -# -L -o "${tmp_dir}/${FILENAME}" "$url"
+  extract_source "${tmp_dir}/${FILENAME}" "$SOURCE_DIR"
 fi
 
-if [[ -n "$requested_version" && -f "${APP_DIR}/source/_version.py" ]]; then
-  printf '__version__ = "%s"\n' "$requested_version" > "${APP_DIR}/source/_version.py"
+[[ -f "${SOURCE_DIR}/main.py" ]] || die "bundle missing main.py"
+[[ -f "${SOURCE_DIR}/_version.py" ]] || die "bundle missing _version.py"
+[[ -f "${SOURCE_DIR}/requirements.txt" ]] || die "bundle missing requirements.txt"
+[[ -d "${SOURCE_DIR}/replyguy" ]] || die "bundle missing replyguy package"
+
+if [[ -n "$requested_version" && -f "${SOURCE_DIR}/_version.py" ]]; then
+  printf '__version__ = "%s"\n' "${requested_version#v}" > "${SOURCE_DIR}/_version.py"
 fi
 
 python3 -m venv "$VENV_DIR"
 "${VENV_DIR}/bin/pip" install --upgrade pip >/dev/null
-"${VENV_DIR}/bin/pip" install -r "${APP_DIR}/source/requirements.txt" >/dev/null
+"${VENV_DIR}/bin/pip" install -r "${SOURCE_DIR}/requirements.txt" >/dev/null
 
 cat > "${INSTALL_DIR}/${APP}" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
-"${VENV_DIR}/bin/python" "${APP_DIR}/source/main.py" "\$@"
+"${VENV_DIR}/bin/python" "${SOURCE_DIR}/main.py" "\$@"
 EOF
 chmod 755 "${INSTALL_DIR}/${APP}"
-
-add_to_path() {
-  local config_file="$1"
-  local command="$2"
-  if grep -Fxq "$command" "$config_file" 2>/dev/null; then
-    return 0
-  fi
-  {
-    echo ""
-    echo "# ${APP}"
-    echo "$command"
-  } >> "$config_file"
-}
 
 if [[ "$no_modify_path" != "true" && ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
   XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -161,6 +200,7 @@ if [[ "$no_modify_path" != "true" && ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
     fish) config_candidates=("$HOME/.config/fish/config.fish") ;;
     *) config_candidates=("$HOME/.profile" "$HOME/.bashrc") ;;
   esac
+
   config_file=""
   for f in "${config_candidates[@]}"; do
     if [[ -f "$f" ]]; then
@@ -168,6 +208,7 @@ if [[ "$no_modify_path" != "true" && ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
       break
     fi
   done
+
   if [[ -n "$config_file" ]]; then
     if [[ "$current_shell" == "fish" ]]; then
       add_to_path "$config_file" "fish_add_path $INSTALL_DIR"

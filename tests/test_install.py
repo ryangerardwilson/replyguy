@@ -57,6 +57,37 @@ class InstallScriptTests(unittest.TestCase):
             self.assertEqual(result.stdout, "")
             self.assertEqual(result.stderr, "")
 
+    def test_version_flag_without_argument_prints_latest_release(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+
+            self._write_executable(
+                bin_dir / "curl",
+                "#!/usr/bin/bash\n"
+                "if [[ \"$1\" == \"-fsSL\" && \"$2\" == \"https://api.github.com/repos/ryangerardwilson/replyguy/releases/latest\" ]]; then\n"
+                "  printf '%s\n' '{\"tag_name\":\"v0.1.4\"}'\n"
+                "  exit 0\n"
+                "fi\n"
+                "echo unexpected curl call >&2\n"
+                "exit 1\n",
+            )
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+
+            result = subprocess.run(
+                ["/usr/bin/bash", str(INSTALLER), "-v"],
+                capture_output=True,
+                text=True,
+                env=env,
+                check=True,
+            )
+
+            self.assertEqual(result.stdout, "0.1.4\n")
+            self.assertEqual(result.stderr, "")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,6 @@
+[app]
+name = "replyguy"
+repo = "ryangerardwilson/replyguy"
+install_strategy = "python-source"
+release_asset = "replyguy.tar.gz"
+install_test_path = "tests/test_install.py"

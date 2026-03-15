@@ -5,11 +5,10 @@ import os
 import shlex
 import subprocess
 import sys
-import tempfile
-import urllib.request
 from pathlib import Path
 
 from _version import __version__
+from rgw_cli_contract import AppSpec, resolve_install_script_path, run_app
 
 from .config import load_config
 from .editor import open_in_editor
@@ -18,7 +17,7 @@ from .paths import config_path, ensure_dirs
 
 ANSI_RESET = "\033[0m"
 ANSI_GRAY = "\033[38;5;245m"
-INSTALL_SCRIPT_URL = "https://raw.githubusercontent.com/ryangerardwilson/replyguy/main/install.sh"
+INSTALL_SCRIPT = resolve_install_script_path(Path(__file__).resolve().parents[1] / "main.py")
 
 HELP_TEXT = """Replyguy CLI
 turn bookmarked X posts into replies you can post fast
@@ -237,49 +236,15 @@ def show_status() -> int:
     return 0
 
 
-def upgrade_app() -> int:
-    with urllib.request.urlopen(INSTALL_SCRIPT_URL, timeout=20) as response:
-        script_body = response.read()
-    with tempfile.NamedTemporaryFile(delete=False) as handle:
-        handle.write(script_body)
-        script_path = Path(handle.name)
-    try:
-        script_path.chmod(0o700)
-        result = subprocess.run(
-            ["/usr/bin/env", "bash", str(script_path), "-u"],
-            check=False,
-            text=True,
-            env=os.environ.copy(),
-        )
-        return result.returncode
-    finally:
-        script_path.unlink(missing_ok=True)
+def _config_path() -> Path:
+    ensure_dirs()
+    load_config()
+    return config_path()
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = list(sys.argv[1:] if argv is None else argv)
-    if not args:
-        print_help()
-        return 0
-    if args == ["-h"]:
-        print_help()
-        return 0
-    if args == ["-v"]:
-        print(__version__)
-        return 0
-    if args == ["-u"]:
-        return upgrade_app()
-
+def _dispatch(args: list[str]) -> int:
     parser = build_parser()
     parsed = parser.parse_args(args)
-
-    if parsed.help:
-        print_help()
-        return 0
-    if parsed.version and len(args) > 1:
-        raise ReplyGuyError("`replyguy -v` cannot be combined with another action")
-    if parsed.upgrade and len(args) > 1:
-        raise ReplyGuyError("`replyguy -u` cannot be combined with another action")
 
     command = parsed.command
     if command == "exhale":
@@ -315,3 +280,18 @@ def main(argv: list[str] | None = None) -> int:
             raise ReplyGuyError("valid shape: `replyguy _inhale_bookmarks`")
         return process_inhale_bookmarks()
     raise ReplyGuyError(f"unknown command: {command}")
+
+
+APP_SPEC = AppSpec(
+    app_name="replyguy",
+    version=__version__,
+    help_text=HELP_TEXT,
+    install_script_path=INSTALL_SCRIPT,
+    no_args_mode="help",
+    config_path_factory=_config_path,
+)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = list(sys.argv[1:] if argv is None else argv)
+    return run_app(APP_SPEC, args, _dispatch)

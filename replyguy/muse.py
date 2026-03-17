@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
-import sys
 from typing import Any
 
 from .bookmark_queue import load_queue, next_pending_item, remove_completed_items, replace_item, save_queue
@@ -14,24 +12,16 @@ from .x_bridge import remove_bookmark, remove_bookmark_background
 
 REPLY_START = "<!-- reply-start -->"
 REPLY_END = "<!-- reply-end -->"
-ANSI_RESET = "\033[0m"
-ANSI_GRAY = "\033[38;5;245m"
-
-
-def _muted_text(text: str) -> str:
-    if not sys.stdout.isatty() or "NO_COLOR" in os.environ:
-        return text
-    return f"{ANSI_GRAY}{text}{ANSI_RESET}"
 
 
 def _print_item(item: dict[str, Any]) -> None:
     print("")
     print("-------------------------------------")
     print("")
-    print(_muted_text(f"@{item.get('author_username') or '-'}"))
-    print(_muted_text(str(item.get("url") or "-")))
+    print(f"@{item.get('author_username') or '-'}")
+    print(str(item.get("url") or "-"))
     print("")
-    print(_muted_text(str(item.get("text") or "").strip() or "-"))
+    print(str(item.get("text") or "").strip() or "-")
     print("")
     options = item.get("reply_options") or []
     if options:

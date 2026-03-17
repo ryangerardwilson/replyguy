@@ -15,8 +15,6 @@ from .editor import open_in_editor
 from .errors import ReplyGuyError
 from .paths import config_path, ensure_dirs
 
-ANSI_RESET = "\033[0m"
-ANSI_GRAY = "\033[38;5;245m"
 INSTALL_SCRIPT = resolve_install_script_path(Path(__file__).resolve().parents[1] / "main.py")
 
 HELP_TEXT = """Replyguy CLI
@@ -53,16 +51,8 @@ features:
   # conf
   replyguy conf
 """
-
-
-def _muted_text(text: str) -> str:
-    if not sys.stdout.isatty() or "NO_COLOR" in os.environ:
-        return text
-    return f"{ANSI_GRAY}{text}{ANSI_RESET}"
-
-
 def print_help() -> None:
-    print(_muted_text(HELP_TEXT.rstrip()))
+    print(HELP_TEXT.rstrip())
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -232,7 +222,7 @@ def show_status() -> int:
     from .status import render_status
 
     ensure_dirs()
-    print(_muted_text(render_status()))
+    print(render_status())
     return 0
 
 

@@ -29,11 +29,11 @@ flags:
     upgrade to the latest release
 
 features:
-  inhale bookmarked X posts into a prepared reply queue in the background
+  inhale bookmarked X posts now and report how many replies are ready
   # inhale
   replyguy inhale
 
-  run inhale hourly in the background, disable it, or inspect the timer
+  run inhale hourly in the background, disable it, or inspect timer plus queue state
   # ti | td | st
   replyguy ti
   replyguy td
@@ -184,16 +184,23 @@ def open_exhale() -> int:
 
 
 def inhale_bookmarks() -> int:
+    from .pipeline import sync_bookmark_queue
+
     ensure_dirs()
-    _spawn_background("_inhale_bookmarks")
-    print("replyguy inhale: started background bookmark sync")
+    result = sync_bookmark_queue()
+    print(
+        f"replyguy inhale: {result.new_inhaled} new, {result.awaiting_exhale} awaiting exhale"
+    )
     return 0
 
 
 def process_inhale_bookmarks() -> int:
     from .pipeline import sync_bookmark_queue
 
-    sync_bookmark_queue()
+    result = sync_bookmark_queue()
+    print(
+        f"replyguy inhale: {result.new_inhaled} new, {result.awaiting_exhale} awaiting exhale"
+    )
     return 0
 
 
@@ -213,8 +220,14 @@ def disable_timer() -> int:
 
 
 def timer_status() -> int:
+    from .status import render_status
+
     result = _systemctl_user("status", f"{_replyguy_unit_name()}.timer")
-    print(result.stdout.strip())
+    timer_output = result.stdout.strip()
+    if timer_output:
+        print(timer_output)
+        print()
+    print(render_status())
     return 0
 
 

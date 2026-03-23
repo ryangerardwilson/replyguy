@@ -50,11 +50,13 @@ class ReplyGuyCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(subprocess_run.call_args.args[0][0], "nvim")
 
-    def test_inhale_starts_background_job(self) -> None:
-        with patch("replyguy.cli._spawn_background") as spawn_background:
-            code = main(["inhale"])
+    def test_inhale_prints_processed_counts(self) -> None:
+        result = type("Result", (), {"new_inhaled": 3, "awaiting_exhale": 5})()
+        with patch("replyguy.pipeline.sync_bookmark_queue", return_value=result):
+            with patch("sys.stdout", new=StringIO()) as stdout:
+                code = main(["inhale"])
         self.assertEqual(code, 0)
-        spawn_background.assert_called_once_with("_inhale_bookmarks")
+        self.assertEqual(stdout.getvalue(), "replyguy inhale: 3 new, 5 awaiting exhale\n")
 
     def test_exhale_runs_interactive_session(self) -> None:
         with patch("replyguy.muse.run_muse_session", return_value=0) as run_session:
@@ -88,6 +90,19 @@ class ReplyGuyCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         write_units.assert_called_once_with()
         systemctl.assert_called_with("disable", "--now", "replyguy.timer")
+
+    def test_st_prints_timer_and_queue_status(self) -> None:
+        status_result = type("Result", (), {"stdout": "timer up\nrecent run"})()
+        with patch("replyguy.cli._systemctl_user", return_value=status_result):
+            with patch("replyguy.status.render_status", return_value="replyguy status\npending      : 4") as render_status:
+                with patch("sys.stdout", new=StringIO()) as stdout:
+                    code = main(["st"])
+        self.assertEqual(code, 0)
+        render_status.assert_called_once_with()
+        self.assertEqual(
+            stdout.getvalue(),
+            "timer up\nrecent run\n\nreplyguy status\npending      : 4\n",
+        )
 
     def test_build_runtime_command_uses_launcher_only_when_frozen(self) -> None:
         with patch("sys.executable", "/tmp/replyguy"), patch("sys.frozen", True, create=True):

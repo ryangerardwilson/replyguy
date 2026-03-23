@@ -25,6 +25,8 @@ class ProcessResult:
     job_id: str
     summary: str
     digest_path: Path
+    new_inhaled: int
+    awaiting_exhale: int
 
 
 def _job_id(prefix: str) -> str:
@@ -270,9 +272,17 @@ def sync_bookmark_queue() -> ProcessResult:
                         "total": 0,
                         "current_tweet_id": "",
                         "last_error": "",
+                        "new_inhaled": 0,
+                        "awaiting_exhale": awaiting_exhale,
                     }
                 )
-                return ProcessResult(job_id=job_id, summary=summary, digest_path=digest_path)
+                return ProcessResult(
+                    job_id=job_id,
+                    summary=summary,
+                    digest_path=digest_path,
+                    new_inhaled=0,
+                    awaiting_exhale=awaiting_exhale,
+                )
 
             notify("replyguy", "inhale started")
             new_inhaled = 0
@@ -356,9 +366,17 @@ def sync_bookmark_queue() -> ProcessResult:
                     "total": total,
                     "current_tweet_id": "",
                     "last_error": "",
+                    "new_inhaled": new_inhaled,
+                    "awaiting_exhale": awaiting_exhale,
                 }
             )
-            return ProcessResult(job_id=job_id, summary=summary, digest_path=digest_path)
+            return ProcessResult(
+                job_id=job_id,
+                summary=summary,
+                digest_path=digest_path,
+                new_inhaled=new_inhaled,
+                awaiting_exhale=awaiting_exhale,
+            )
         except Exception as exc:
             save_runtime_status(
                 {
@@ -370,6 +388,8 @@ def sync_bookmark_queue() -> ProcessResult:
                     "total": 0,
                     "current_tweet_id": "",
                     "last_error": str(exc),
+                    "new_inhaled": 0,
+                    "awaiting_exhale": 0,
                 }
             )
             notify("replyguy", f"inhale failed: {exc}")

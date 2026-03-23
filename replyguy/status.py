@@ -82,6 +82,7 @@ def render_status() -> str:
         f"phase        : {str(runtime.get('phase') or '-')}",
         f"job_id       : {str(runtime.get('job_id') or '-')}",
         f"last_inhale  : {str(queue.get('synced_at') or '-')}",
+        f"last_new     : {int(runtime.get('new_inhaled') or 0)}",
         f"progress     : {int(runtime.get('current') or 0)}/{int(runtime.get('total') or 0)}",
         f"current_id   : {str(runtime.get('current_tweet_id') or '-')}",
         f"pending      : {len(pending)}",

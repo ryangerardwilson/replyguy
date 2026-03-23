@@ -33,6 +33,7 @@ class ReplyGuyStatusTests(unittest.TestCase):
             rendered = render_status()
 
         self.assertIn("running      : yes", rendered)
+        self.assertIn("last_new     : 0", rendered)
         self.assertIn("latest_error : -", rendered)
 
     def test_stopped_status_shows_latest_queue_error_when_runtime_error_is_empty(self) -> None:
@@ -54,6 +55,7 @@ class ReplyGuyStatusTests(unittest.TestCase):
             "total": 34,
             "current_tweet_id": "",
             "last_error": "",
+            "new_inhaled": 3,
         }
         with patch("replyguy.status.ensure_dirs"), patch(
             "replyguy.status.load_queue", return_value=queue
@@ -66,6 +68,7 @@ class ReplyGuyStatusTests(unittest.TestCase):
             "latest_error : 2031469834354167973: Error: No such file or directory (os error 2)",
             rendered,
         )
+        self.assertIn("last_new     : 3", rendered)
 
 
 if __name__ == "__main__":

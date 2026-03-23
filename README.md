@@ -14,10 +14,11 @@ in XDG directories.
 curl -fsSL https://raw.githubusercontent.com/ryangerardwilson/replyguy/main/install.sh | bash
 ```
 
-Manually add this to `~/.bashrc`, then reload your shell:
+If `~/.local/bin` is not already on your `PATH`, add it once to `~/.bashrc`
+and reload your shell:
 
 ```bash
-export PATH="$HOME/.replyguy/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
 source ~/.bashrc
 ```
 
@@ -35,11 +36,11 @@ flags:
     upgrade to the latest release
 
 features:
-  inhale bookmarked X posts into a prepared reply queue in the background
+  inhale bookmarked X posts now and report how many replies are ready
   # inhale
   replyguy inhale
 
-  run inhale hourly in the background, disable it, or inspect the timer
+  run inhale hourly in the background, disable it, or inspect timer plus queue state
   # ti | td | st
   replyguy ti
   replyguy td
@@ -58,13 +59,14 @@ features:
   replyguy conf
 ```
 
-`replyguy inhale` asks the `x` app for bookmarked posts, prepares reply options in
-the background, stores the queue under XDG state, and sends one notification per
-processed bookmark.
+`replyguy inhale` asks the `x` app for bookmarked posts, prepares reply options,
+stores the queue under XDG state, and prints how many new items were inhaled and
+how many now await exhale.
 
 `replyguy ti` installs an hourly user timer through systemd so inhale keeps
 running while you keep bookmarking posts. `replyguy td` disables that timer.
-`replyguy st` shows the timer status through `systemctl --user`.
+`replyguy st` shows the timer status through `systemctl --user` and then prints
+the current replyguy queue summary, including results from manual inhale runs.
 
 `replyguy exhale` walks that queue in the terminal, lets you pick an option,
 opens a final edit in your editor, opens the bookmarked post in Google Chrome
@@ -72,8 +74,9 @@ Stable, copies the edited reply to the clipboard with `wl-copy`, and removes
 the bookmark. That leaves the final send as a manual paste in X.
 
 `replyguy status` shows whether an inhale job is currently running, the last
-inhale timestamp, pending count, posted-but-not-unbookmarked count, and the
-latest generation error if one exists.
+inhale timestamp, how many items were new in the latest inhale, pending count,
+posted-but-not-unbookmarked count, and the latest generation error if one
+exists.
 
 ## Config
 

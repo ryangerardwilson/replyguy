@@ -23,6 +23,8 @@ class ReplyGuyPipelineTests(unittest.TestCase):
                                 result = sync_bookmark_queue()
 
         self.assertEqual(result.summary, "bookmarks=0")
+        self.assertEqual(result.new_inhaled, 0)
+        self.assertEqual(result.awaiting_exhale, 0)
         self.assertEqual([call.args for call in notify.call_args_list], [("replyguy", "nothing to inhale")])
 
     def test_sync_notifies_when_nothing_left_to_inhale_but_queue_is_waiting(self) -> None:
@@ -55,6 +57,8 @@ class ReplyGuyPipelineTests(unittest.TestCase):
                                     result = sync_bookmark_queue()
 
         self.assertEqual(result.summary, "bookmarks=0")
+        self.assertEqual(result.new_inhaled, 0)
+        self.assertEqual(result.awaiting_exhale, 1)
         self.assertEqual(
             [call.args for call in notify.call_args_list],
             [("replyguy", "nothing left to inhale, 1 awaiting exhale")],
@@ -147,6 +151,8 @@ class ReplyGuyPipelineTests(unittest.TestCase):
                                     result = sync_bookmark_queue()
 
         self.assertEqual(result.summary, "bookmarks=1")
+        self.assertEqual(result.new_inhaled, 0)
+        self.assertEqual(result.awaiting_exhale, 1)
         self.assertEqual(
             [call.args for call in notify.call_args_list],
             [

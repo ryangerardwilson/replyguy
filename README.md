@@ -14,6 +14,13 @@ in XDG directories.
 curl -fsSL https://raw.githubusercontent.com/ryangerardwilson/replyguy/main/install.sh | bash
 ```
 
+Manually add this to `~/.bashrc`, then reload your shell:
+
+```bash
+export PATH="$HOME/.replyguy/bin:$PATH"
+source ~/.bashrc
+```
+
 ## Usage
 
 ```text

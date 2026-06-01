@@ -12,7 +12,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "codex_model": "gpt-5.4",
     "codex_reasoning_effort": "xhigh",
     "codex_context_paths": [
-        "/home/ryan/Documents/agent_context/REPLY_GUY_GUIDELINES.md",
+        "/home/ryan/Subagents/cmo/REPLY_GUY_GUIDELINES.md",
     ],
     "reply_count_per_target": 4,
     "bookmark_sync_limit": 100,

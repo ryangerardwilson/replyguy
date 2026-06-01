@@ -21,11 +21,17 @@ class ReplyGuyCliTests(unittest.TestCase):
         self.assertIn("Replyguy CLI", help_output)
         self.assertIn("features:", help_output)
         self.assertIn("replyguy inhale", help_output)
-        self.assertIn("replyguy ti", help_output)
-        self.assertIn("replyguy td", help_output)
-        self.assertIn("replyguy st", help_output)
+        self.assertIn("replyguy timer install", help_output)
+        self.assertIn("replyguy timer disable", help_output)
+        self.assertIn("replyguy timer status", help_output)
         self.assertIn("replyguy exhale", help_output)
         self.assertIn("replyguy status", help_output)
+        self.assertIn("replyguy config", help_output)
+        help_lines = {line.strip() for line in help_output.splitlines()}
+        self.assertNotIn("replyguy ti", help_lines)
+        self.assertNotIn("replyguy td", help_lines)
+        self.assertNotIn("replyguy st", help_lines)
+        self.assertNotIn("replyguy conf", help_lines)
         self.assertNotIn("replyguy rant", help_output)
         self.assertNotIn("replyguy sync", help_output)
         self.assertNotIn("replyguy muse", help_output)
@@ -37,7 +43,7 @@ class ReplyGuyCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(stdout.getvalue().strip(), "0.0.0")
 
-    def test_conf_prefers_visual(self) -> None:
+    def test_config_prefers_visual(self) -> None:
         with TemporaryDirectory() as tmp:
             with patch.dict(
                 "os.environ",
@@ -46,7 +52,7 @@ class ReplyGuyCliTests(unittest.TestCase):
             ):
                 with patch("subprocess.run") as subprocess_run:
                     subprocess_run.return_value.returncode = 0
-                    code = main(["conf"])
+                    code = main(["config"])
         self.assertEqual(code, 0)
         self.assertEqual(subprocess_run.call_args.args[0][0], "nvim")
 
@@ -72,37 +78,62 @@ class ReplyGuyCliTests(unittest.TestCase):
         render_status.assert_called_once_with()
         self.assertEqual(stdout.getvalue(), "replyguy status\n\n")
 
-    def test_ti_installs_timer(self) -> None:
+    def test_timer_install_installs_timer(self) -> None:
         with patch("replyguy.cli._write_timer_units") as write_units, patch(
             "replyguy.cli._systemctl_user"
         ) as systemctl:
-            code = main(["ti"])
+            code = main(["timer", "install"])
         self.assertEqual(code, 0)
         write_units.assert_called_once_with()
         systemctl.assert_any_call("daemon-reload")
         systemctl.assert_any_call("enable", "--now", "replyguy.timer")
 
-    def test_td_disables_timer(self) -> None:
+    def test_timer_disable_disables_timer(self) -> None:
         with patch("replyguy.cli._write_timer_units") as write_units, patch(
             "replyguy.cli._systemctl_user"
         ) as systemctl:
-            code = main(["td"])
+            code = main(["timer", "disable"])
         self.assertEqual(code, 0)
         write_units.assert_called_once_with()
         systemctl.assert_called_with("disable", "--now", "replyguy.timer")
 
-    def test_st_prints_timer_and_queue_status(self) -> None:
+    def test_timer_status_prints_timer_and_queue_status(self) -> None:
         status_result = type("Result", (), {"stdout": "timer up\nrecent run"})()
         with patch("replyguy.cli._systemctl_user", return_value=status_result):
             with patch("replyguy.status.render_status", return_value="replyguy status\npending      : 4") as render_status:
                 with patch("sys.stdout", new=StringIO()) as stdout:
-                    code = main(["st"])
+                    code = main(["timer", "status"])
         self.assertEqual(code, 0)
         render_status.assert_called_once_with()
         self.assertEqual(
             stdout.getvalue(),
             "timer up\nrecent run\n\nreplyguy status\npending      : 4\n",
         )
+
+    def test_timer_status_still_prints_queue_when_systemctl_fails(self) -> None:
+        status_result = type(
+            "Result",
+            (),
+            {"stdout": "", "stderr": "Unit replyguy.timer could not be found.", "returncode": 4},
+        )()
+        with patch("replyguy.cli._systemctl_user", return_value=status_result):
+            with patch("replyguy.status.render_status", return_value="replyguy status\npending      : 4") as render_status:
+                with patch("sys.stdout", new=StringIO()) as stdout:
+                    code = main(["timer", "status"])
+        self.assertEqual(code, 0)
+        render_status.assert_called_once_with()
+        self.assertEqual(
+            stdout.getvalue(),
+            "Unit replyguy.timer could not be found.\n\nreplyguy status\npending      : 4\n",
+        )
+
+    def test_old_short_commands_are_not_public_commands(self) -> None:
+        for command in (["ti"], ["td"], ["st"], ["conf"]):
+            with self.subTest(command=command):
+                with patch("sys.stderr", new=StringIO()) as stderr:
+                    code = main(command)
+                self.assertEqual(code, 1)
+                self.assertIn("unknown command", stderr.getvalue())
 
     def test_build_runtime_command_uses_launcher_only_when_frozen(self) -> None:
         with patch("sys.executable", "/tmp/replyguy"), patch("sys.frozen", True, create=True):

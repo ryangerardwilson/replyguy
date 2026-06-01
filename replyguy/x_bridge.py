@@ -47,7 +47,7 @@ def _run_x(config: dict[str, Any], *args: str) -> str:
 
 
 def list_bookmarks(config: dict[str, Any], limit: int) -> list[dict[str, Any]]:
-    stdout = _run_x(config, "b", "ls", "-j", "-n", str(limit))
+    stdout = _run_x(config, "bookmarks", "list", "json", "limit", str(limit))
     try:
         payload = json.loads(stdout or "{}")
     except json.JSONDecodeError as exc:
@@ -59,7 +59,7 @@ def list_bookmarks(config: dict[str, Any], limit: int) -> list[dict[str, Any]]:
 
 
 def post_reply(config: dict[str, Any], tweet_id: str, text: str) -> str:
-    stdout = _run_x(config, "r", tweet_id, text)
+    stdout = _run_x(config, "reply", "to", tweet_id, "body", text)
     marker = "id="
     line = stdout.strip().splitlines()[-1] if stdout.strip() else ""
     if marker in line:
@@ -68,11 +68,11 @@ def post_reply(config: dict[str, Any], tweet_id: str, text: str) -> str:
 
 
 def remove_bookmark(config: dict[str, Any], tweet_id: str) -> None:
-    _run_x(config, "b", "rm", tweet_id)
+    _run_x(config, "bookmarks", "remove", tweet_id)
 
 
 def remove_bookmark_background(config: dict[str, Any], tweet_id: str) -> None:
-    command = _command_prefix(config) + ["b", "rm", tweet_id]
+    command = _command_prefix(config) + ["bookmarks", "remove", tweet_id]
     subprocess.Popen(
         command,
         stdin=subprocess.DEVNULL,

@@ -41,10 +41,10 @@ features:
   replyguy inhale
 
   run inhale hourly in the background, disable it, or inspect timer plus queue state
-  # ti | td | st
-  replyguy ti
-  replyguy td
-  replyguy st
+  # timer install | timer disable | timer status
+  replyguy timer install
+  replyguy timer disable
+  replyguy timer status
 
   exhale bookmarked X posts, choose a reply, do a final edit, post it, and remove the bookmark
   # exhale
@@ -55,18 +55,19 @@ features:
   replyguy status
 
   open the config in your editor
-  # conf
-  replyguy conf
+  # config
+  replyguy config
 ```
 
 `replyguy inhale` asks the `x` app for bookmarked posts, prepares reply options,
 stores the queue under XDG state, and prints how many new items were inhaled and
 how many now await exhale.
 
-`replyguy ti` installs an hourly user timer through systemd so inhale keeps
-running while you keep bookmarking posts. `replyguy td` disables that timer.
-`replyguy st` shows the timer status through `systemctl --user` and then prints
-the current replyguy queue summary, including results from manual inhale runs.
+`replyguy timer install` installs an hourly user timer through systemd so
+inhale keeps running while you keep bookmarking posts. `replyguy timer disable`
+disables that timer. `replyguy timer status` shows the timer status through
+`systemctl --user` and then prints the current replyguy queue summary,
+including results from manual inhale runs.
 
 `replyguy exhale` walks that queue in the terminal, lets you pick an option,
 opens a final edit in your editor, opens the bookmarked post in Google Chrome
@@ -83,7 +84,7 @@ exists.
 Open the config with:
 
 ```bash
-replyguy conf
+replyguy config
 ```
 
 Default config path:
@@ -105,7 +106,7 @@ The default config stores:
 with `codex login`.
 
 By default, `replyguy` injects only
-`/home/ryan/Documents/agent_context/REPLY_GUY_GUIDELINES.md` as standing
+`/home/ryan/Subagents/cmo/REPLY_GUY_GUIDELINES.md` as standing
 context for drafting.
 
 ## State
@@ -122,7 +123,7 @@ That local state is not committed and is not part of the public repo.
 
 - `google-chrome-stable` for opening the bookmarked post during `exhale`
 - `wl-copy` for putting the selected reply on the clipboard
-- `systemd --user` if you want the hourly inhale timer via `replyguy ti`
+- `systemd --user` if you want the hourly inhale timer via `replyguy timer install`
 
 ## Source Run
 

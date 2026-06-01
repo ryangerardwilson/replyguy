@@ -1,21 +1,24 @@
 from __future__ import annotations
 
-import argparse
 import os
 import shlex
 import subprocess
 import sys
+import tempfile
+import urllib.request
 from pathlib import Path
 
 from _version import __version__
-from rgw_cli_contract import AppSpec, resolve_install_script_path, run_app
 
 from .config import load_config
 from .editor import open_in_editor
 from .errors import ReplyGuyError
 from .paths import config_path, ensure_dirs
 
-INSTALL_SCRIPT = resolve_install_script_path(Path(__file__).resolve().parents[1] / "main.py")
+ANSI_GRAY = "\033[38;5;245m"
+ANSI_RESET = "\033[0m"
+INSTALL_SCRIPT = Path(__file__).resolve().parents[1] / "install.sh"
+INSTALL_SCRIPT_URL = "https://raw.githubusercontent.com/ryangerardwilson/replyguy/main/install.sh"
 
 HELP_TEXT = """Replyguy CLI
 turn bookmarked X posts into replies you can post fast
@@ -34,10 +37,10 @@ features:
   replyguy inhale
 
   run inhale hourly in the background, disable it, or inspect timer plus queue state
-  # ti | td | st
-  replyguy ti
-  replyguy td
-  replyguy st
+  # timer install | timer disable | timer status
+  replyguy timer install
+  replyguy timer disable
+  replyguy timer status
 
   exhale bookmarked X posts, choose a reply, do a final edit, post it, and remove the bookmark
   # exhale
@@ -48,21 +51,49 @@ features:
   replyguy status
 
   open the config in your editor
-  # conf
-  replyguy conf
+  # config
+  replyguy config
 """
+
+
+def muted(text: str) -> str:
+    if not sys.stdout.isatty() or "NO_COLOR" in os.environ:
+        return text
+    return f"{ANSI_GRAY}{text}{ANSI_RESET}"
+
+
 def print_help() -> None:
-    print(HELP_TEXT.rstrip())
+    print(muted(HELP_TEXT.rstrip()))
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="replyguy", add_help=False)
-    parser.add_argument("-h", action="store_true", dest="help")
-    parser.add_argument("-v", action="store_true", dest="version")
-    parser.add_argument("-u", action="store_true", dest="upgrade")
-    parser.add_argument("command", nargs="?")
-    parser.add_argument("params", nargs=argparse.REMAINDER)
-    return parser
+def upgrade_app() -> int:
+    if INSTALL_SCRIPT.exists():
+        result = subprocess.run(
+            ["/usr/bin/env", "bash", str(INSTALL_SCRIPT), "-u"],
+            check=False,
+            text=True,
+            env=os.environ.copy(),
+        )
+        return result.returncode
+
+    with urllib.request.urlopen(INSTALL_SCRIPT_URL) as response:
+        script_body = response.read()
+
+    with tempfile.NamedTemporaryFile(delete=False) as handle:
+        handle.write(script_body)
+        script_path = Path(handle.name)
+
+    try:
+        script_path.chmod(0o700)
+        result = subprocess.run(
+            ["/usr/bin/env", "bash", str(script_path), "-u"],
+            check=False,
+            text=True,
+            env=os.environ.copy(),
+        )
+        return result.returncode
+    finally:
+        script_path.unlink(missing_ok=True)
 
 
 def _build_runtime_command(*args: str) -> str:
@@ -71,25 +102,6 @@ def _build_runtime_command(*args: str) -> str:
         command_parts.append(shlex.quote(str(Path(__file__).resolve().parents[1] / "main.py")))
     command_parts.extend(shlex.quote(arg) for arg in args)
     return " ".join(command_parts)
-
-
-def _runtime_argv(*args: str) -> list[str]:
-    command_parts = [str(Path(sys.executable).resolve())]
-    if not getattr(sys, "frozen", False):
-        command_parts.append(str(Path(__file__).resolve().parents[1] / "main.py"))
-    command_parts.extend(args)
-    return command_parts
-
-
-def _spawn_background(*args: str) -> None:
-    subprocess.Popen(
-        _runtime_argv(*args),
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
-        cwd=str(Path(__file__).resolve().parents[1]),
-    )
 
 
 def _replyguy_unit_name() -> str:
@@ -161,13 +173,19 @@ def _write_timer_units() -> None:
     timer_path.write_text(timer_body, encoding="utf-8")
 
 
-def _systemctl_user(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["systemctl", "--user", *args],
-        check=True,
-        text=True,
-        capture_output=True,
-    )
+def _systemctl_user(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(
+            ["systemctl", "--user", *args],
+            check=check,
+            text=True,
+            capture_output=True,
+        )
+    except FileNotFoundError as exc:
+        raise ReplyGuyError("missing dependency: systemctl") from exc
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.stderr or exc.stdout or str(exc)).strip()
+        raise ReplyGuyError(detail) from exc
 
 
 def open_config() -> int:
@@ -222,10 +240,17 @@ def disable_timer() -> int:
 def timer_status() -> int:
     from .status import render_status
 
-    result = _systemctl_user("status", f"{_replyguy_unit_name()}.timer")
-    timer_output = result.stdout.strip()
-    if timer_output:
-        print(timer_output)
+    try:
+        result = _systemctl_user("status", f"{_replyguy_unit_name()}.timer", check=False)
+        timer_output = (result.stdout or result.stderr or "").strip()
+        if timer_output:
+            print(timer_output)
+            print()
+        elif result.returncode != 0:
+            print(f"timer status unavailable: systemctl exited {result.returncode}")
+            print()
+    except ReplyGuyError as exc:
+        print(f"timer status unavailable: {exc}")
         print()
     print(render_status())
     return 0
@@ -239,62 +264,57 @@ def show_status() -> int:
     return 0
 
 
-def _config_path() -> Path:
-    ensure_dirs()
-    load_config()
-    return config_path()
-
-
 def _dispatch(args: list[str]) -> int:
-    parser = build_parser()
-    parsed = parser.parse_args(args)
-
-    command = parsed.command
+    command = args[0]
+    params = args[1:]
     if command == "exhale":
-        if parsed.params:
+        if params:
             raise ReplyGuyError("valid shape: `replyguy exhale`")
         return open_exhale()
     if command == "inhale":
-        if parsed.params:
+        if params:
             raise ReplyGuyError("valid shape: `replyguy inhale`")
         return inhale_bookmarks()
-    if command == "conf":
-        if parsed.params:
-            raise ReplyGuyError("valid shape: `replyguy conf`")
+    if command == "config":
+        if params:
+            raise ReplyGuyError("valid shape: `replyguy config`")
         return open_config()
     if command == "status":
-        if parsed.params:
+        if params:
             raise ReplyGuyError("valid shape: `replyguy status`")
         return show_status()
-    if command == "ti":
-        if parsed.params:
-            raise ReplyGuyError("valid shape: `replyguy ti`")
-        return install_timer()
-    if command == "td":
-        if parsed.params:
-            raise ReplyGuyError("valid shape: `replyguy td`")
-        return disable_timer()
-    if command == "st":
-        if parsed.params:
-            raise ReplyGuyError("valid shape: `replyguy st`")
-        return timer_status()
+    if command == "timer":
+        if params == ["install"]:
+            return install_timer()
+        if params == ["disable"]:
+            return disable_timer()
+        if params == ["status"]:
+            return timer_status()
+        raise ReplyGuyError("valid shape: `replyguy timer install|disable|status`")
     if command == "_inhale_bookmarks":
-        if parsed.params:
+        if params:
             raise ReplyGuyError("valid shape: `replyguy _inhale_bookmarks`")
         return process_inhale_bookmarks()
     raise ReplyGuyError(f"unknown command: {command}")
 
 
-APP_SPEC = AppSpec(
-    app_name="replyguy",
-    version=__version__,
-    help_text=HELP_TEXT,
-    install_script_path=INSTALL_SCRIPT,
-    no_args_mode="help",
-    config_path_factory=_config_path,
-)
-
-
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
-    return run_app(APP_SPEC, args, _dispatch)
+    try:
+        if not args:
+            print_help()
+            return 0
+        if args == ["-h"]:
+            print_help()
+            return 0
+        if args == ["-v"]:
+            print(__version__)
+            return 0
+        if args == ["-u"]:
+            return upgrade_app()
+        if args[0] in {"-h", "-v", "-u"}:
+            raise ReplyGuyError("Use replyguy -h, replyguy -v, or replyguy -u by itself.")
+        return _dispatch(args)
+    except ReplyGuyError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1

@@ -27,12 +27,12 @@ source ~/.bashrc
 ```text
 Replyguy CLI
 
-flags:
-  replyguy -h
+global actions:
+  replyguy help
     show this help
-  replyguy -v
+  replyguy version
     print the installed version
-  replyguy -u
+  replyguy upgrade
     upgrade to the latest release
 
 features:
@@ -131,14 +131,14 @@ That local state is not committed and is not part of the public repo.
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python main.py -h
+python main.py help
 ```
 
 ## Version And Upgrade
 
 ```bash
-replyguy -v
-replyguy -u
+replyguy version
+replyguy upgrade
 ```
 
-`replyguy -v` prints the installed app version from `_version.py`. Source checkouts keep a placeholder value; tagged release builds should stamp the shipped artifact with the real version.
+`replyguy version` prints the installed app version from `_version.py`. Source checkouts keep a placeholder value; tagged release builds should stamp the shipped artifact with the real version.

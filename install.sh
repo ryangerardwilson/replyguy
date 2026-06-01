@@ -18,20 +18,14 @@ usage() {
   cat <<EOF
 ${APP} Installer
 
-Usage: install.sh [options]
+Usage: install.sh <command>
 
-Options:
-  -h                         Show this help and exit
-  -v [<version>]             Print the latest release version, or install a specific one
-  -u                         Upgrade to the latest release only when newer
-  -b <path>                  Install from a local checkout or source bundle
-  -n                         Do not modify shell config to add to PATH
+Commands:
+  help                       Show this help and exit
+  version [<version>]        Print the latest release version, or install a specific one
+  upgrade                    Upgrade to the latest release only when newer
+  from <path>                Install from a local checkout or source bundle
 
-      --help                 Compatibility alias for -h
-      --version [<version>]  Compatibility alias for -v
-      --upgrade              Compatibility alias for -u
-      --binary <path>        Compatibility alias for -b
-      --no-modify-path       Compatibility alias for -n
 EOF
 }
 
@@ -72,7 +66,7 @@ installed_command_path() {
 read_installed_version() {
   local installed_cmd
   installed_cmd="$(installed_command_path)" || return 0
-  "$installed_cmd" -v 2>/dev/null || true
+  "$installed_cmd" version 2>/dev/null || true
 }
 
 extract_source() {
@@ -155,11 +149,11 @@ print_manual_shell_steps() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -h|--help)
+    help)
       usage
       exit 0
       ;;
-    -v|--version)
+    version)
       if [[ -n "${2:-}" && "${2:0:1}" != "-" ]]; then
         requested_version="${2#v}"
         shift 2
@@ -168,37 +162,33 @@ while [[ $# -gt 0 ]]; do
         shift
       fi
       ;;
-    -u|--upgrade)
+    upgrade)
       upgrade=true
       shift
       ;;
-    -b|--binary)
-      [[ -n "${2:-}" ]] || { echo "Error: -b requires a path"; exit 1; }
+    from)
+      [[ -n "${2:-}" ]] || { echo "Error: from requires a path"; exit 1; }
       binary_path="$2"
       shift 2
       ;;
-    -n|--no-modify-path)
-      no_modify_path=true
-      shift
-      ;;
 
     *)
-      echo "Warning: Unknown option '$1'" >&2
-      shift
+      echo "unknown installer command: $1" >&2
+      exit 1
       ;;
   esac
 done
 
 if $show_latest; then
   [[ "$upgrade" == false && -z "$binary_path" && -z "$requested_version" ]] || \
-    die "-v (no arg) cannot be combined with other options"
+    die "version cannot be combined with other installer commands"
   get_latest_version
   exit 0
 fi
 
 if $upgrade; then
-  [[ -z "$binary_path" ]] || die "-u cannot be used with -b"
-  [[ -z "$requested_version" ]] || die "-u cannot be combined with -v <version>"
+  [[ -z "$binary_path" ]] || die "upgrade cannot be used with from"
+  [[ -z "$requested_version" ]] || die "upgrade cannot be combined with version <version>"
   requested_version="$(get_latest_version)"
   installed_version="$(read_installed_version)"
   installed_version="${installed_version#v}"
@@ -218,8 +208,8 @@ mkdir -p "$tmp_dir"
 trap 'rm -rf "$tmp_dir"' EXIT
 
 if [[ -n "$binary_path" ]]; then
-  [[ -e "$binary_path" ]] || { print_message error "Source bundle not found: $binary_path"; exit 1; }
-  print_message info "\nInstalling ${APP} from local source: ${binary_path}"
+  [[ -e "$binary_path" ]] || { print_message error "Local path not found: $binary_path"; exit 1; }
+  print_message info "\nInstalling ${APP} from local path: ${binary_path}"
   extract_source "$binary_path" "$SOURCE_DIR"
   specific_version="local"
 else
@@ -274,4 +264,4 @@ chmod 755 "${INSTALL_DIR}/${APP}"
 finalize_install
 
 print_manual_shell_steps
-print_message info "Run: ${APP} -h"
+print_message info "Run: ${APP} help"

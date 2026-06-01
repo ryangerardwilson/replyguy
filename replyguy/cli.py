@@ -23,12 +23,12 @@ INSTALL_SCRIPT_URL = "https://raw.githubusercontent.com/ryangerardwilson/replygu
 HELP_TEXT = """Replyguy CLI
 turn bookmarked X posts into replies you can post fast
 
-flags:
-  replyguy -h
+global actions:
+  replyguy help
     show this help
-  replyguy -v
+  replyguy version
     print the installed version
-  replyguy -u
+  replyguy upgrade
     upgrade to the latest release
 
 features:
@@ -69,7 +69,7 @@ def print_help() -> None:
 def upgrade_app() -> int:
     if INSTALL_SCRIPT.exists():
         result = subprocess.run(
-            ["/usr/bin/env", "bash", str(INSTALL_SCRIPT), "-u"],
+            ["/usr/bin/env", "bash", str(INSTALL_SCRIPT), "upgrade"],
             check=False,
             text=True,
             env=os.environ.copy(),
@@ -86,7 +86,7 @@ def upgrade_app() -> int:
     try:
         script_path.chmod(0o700)
         result = subprocess.run(
-            ["/usr/bin/env", "bash", str(script_path), "-u"],
+            ["/usr/bin/env", "bash", str(script_path), "upgrade"],
             check=False,
             text=True,
             env=os.environ.copy(),
@@ -304,16 +304,16 @@ def main(argv: list[str] | None = None) -> int:
         if not args:
             print_help()
             return 0
-        if args == ["-h"]:
+        if args == ["help"]:
             print_help()
             return 0
-        if args == ["-v"]:
+        if args == ["version"]:
             print(__version__)
             return 0
-        if args == ["-u"]:
+        if args == ["upgrade"]:
             return upgrade_app()
-        if args[0] in {"-h", "-v", "-u"}:
-            raise ReplyGuyError("Use replyguy -h, replyguy -v, or replyguy -u by itself.")
+        if args[0] in {"help", "version", "upgrade"}:
+            raise ReplyGuyError("Use replyguy help, replyguy version, or replyguy upgrade by itself.")
         return _dispatch(args)
     except ReplyGuyError as exc:
         print(str(exc), file=sys.stderr)

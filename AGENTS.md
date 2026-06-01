@@ -2,7 +2,7 @@
 
 ## Workspace Defaults
 - Follow `/home/ryan/Subagents/cpo/CLI_TUI_STYLE_GUIDE.md` for CLI/TUI taste and help shape.
-- Follow `/home/ryan/Subagents/cto/CANONICAL_REFERENCE_IMPLEMENTATION_FOR_CLI_AND_TUI_APPS.md` for executable contract details such as `-h`, `-v`, `-u`, installer behavior, release workflow expectations, and regression expectations.
+- Follow `/home/ryan/Subagents/cto/CANONICAL_REFERENCE_IMPLEMENTATION_FOR_CLI_AND_TUI_APPS.md` for executable contract details such as `help`, `version`, `upgrade`, installer behavior, release workflow expectations, and regression expectations.
 - Use `context/INDEX.md` and the files it names for `replyguy`-specific facts.
 - This file only records `replyguy`-specific constraints or durable deviations.
 
@@ -11,7 +11,7 @@
 - The product is keyboard-first, explicit, local-first, and inspectable. It is not a web dashboard.
 - Public repo, private runtime state: keep `muse`, archives, and config in XDG paths outside the repo.
 - `replyguy` owns reply choice and review; the final send is manual through the browser with clipboard help.
-- Canonical public syntax is only `replyguy inhale`, `replyguy exhale`, `replyguy status`, `replyguy timer install|disable|status`, and `replyguy config`, plus global `-h`, `-v`, and `-u`.
+- Canonical public syntax is only `replyguy inhale`, `replyguy exhale`, `replyguy status`, `replyguy timer install|disable|status`, and `replyguy config`, plus global `help`, `version`, and `upgrade`.
 
 ## Product Rules
 - `replyguy inhale` fetches bookmarked X posts through the `x` app, prepares replies immediately, and prints how many new items were inhaled plus how many now await exhale.

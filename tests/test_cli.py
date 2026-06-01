@@ -13,7 +13,7 @@ class ReplyGuyCliTests(unittest.TestCase):
             code = main([])
             no_arg_output = stdout.getvalue()
         with patch("sys.stdout", new=StringIO()) as stdout:
-            help_code = main(["-h"])
+            help_code = main(["help"])
             help_output = stdout.getvalue()
         self.assertEqual(code, 0)
         self.assertEqual(help_code, 0)
@@ -39,7 +39,7 @@ class ReplyGuyCliTests(unittest.TestCase):
 
     def test_version_prints_single_value(self) -> None:
         with patch("sys.stdout", new=StringIO()) as stdout:
-            code = main(["-v"])
+            code = main(["version"])
         self.assertEqual(code, 0)
         self.assertEqual(stdout.getvalue().strip(), "0.0.0")
 
@@ -172,9 +172,9 @@ class ReplyGuyCliTests(unittest.TestCase):
         with patch("urllib.request.urlopen", return_value=_Context()):
             with patch("subprocess.run") as subprocess_run:
                 subprocess_run.return_value.returncode = 0
-                code = main(["-u"])
+                code = main(["upgrade"])
         self.assertEqual(code, 0)
-        self.assertIn("-u", subprocess_run.call_args.args[0])
+        self.assertIn("upgrade", subprocess_run.call_args.args[0])
 
 
 if __name__ == "__main__":

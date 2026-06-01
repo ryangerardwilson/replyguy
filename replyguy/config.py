@@ -8,11 +8,14 @@ from typing import Any
 
 from .paths import config_path, ensure_dirs
 
+OLD_REPLY_GUIDELINES = "/home/ryan/Subagents/cmo/REPLY_GUY_GUIDELINES.md"
+REPLY_GUIDELINES = "/home/ryan/Apps/replyguy/context/copy/REPLY_GUY_GUIDELINES.md"
+
 DEFAULT_CONFIG: dict[str, Any] = {
     "codex_model": "gpt-5.4",
     "codex_reasoning_effort": "xhigh",
     "codex_context_paths": [
-        "/home/ryan/Subagents/cmo/REPLY_GUY_GUIDELINES.md",
+        REPLY_GUIDELINES,
     ],
     "reply_count_per_target": 4,
     "bookmark_sync_limit": 100,
@@ -24,6 +27,12 @@ def _merge_defaults(value: dict[str, Any]) -> dict[str, Any]:
     merged = deepcopy(DEFAULT_CONFIG)
     for key, item in value.items():
         merged[key] = item
+    context_paths = merged.get("codex_context_paths")
+    if isinstance(context_paths, list):
+        merged["codex_context_paths"] = [
+            REPLY_GUIDELINES if path == OLD_REPLY_GUIDELINES else path
+            for path in context_paths
+        ]
     return merged
 
 

@@ -3,6 +3,7 @@
 ## Workspace Defaults
 - Follow `/home/ryan/Subagents/cpo/CLI_TUI_STYLE_GUIDE.md` for CLI/TUI taste and help shape.
 - Follow `/home/ryan/Subagents/cto/CANONICAL_REFERENCE_IMPLEMENTATION_FOR_CLI_AND_TUI_APPS.md` for executable contract details such as `-h`, `-v`, `-u`, installer behavior, release workflow expectations, and regression expectations.
+- Use `context/INDEX.md` and the files it names for `replyguy`-specific facts.
 - This file only records `replyguy`-specific constraints or durable deviations.
 
 ## Scope
@@ -21,7 +22,9 @@
 
 ## Content Rules
 - Keep content and tonality policy out of app-internal prompts when it can live in configured instruction context.
-- Treat configured context files such as `/home/ryan/Subagents/cmo/REPLY_GUY_GUIDELINES.md` as the owner of voice, taste, rhetorical moves, and reply-quality standards.
+- Treat configured context files such as `context/copy/REPLY_GUY_GUIDELINES.md` as the owner of voice, taste, rhetorical moves, and reply-quality standards.
+- Treat `context/operations/COST.md` as the owner of cost-sensitive guidance
+  around Codex generation settings, reply counts, and the hourly timer.
 - App-internal prompt text may enforce only execution-contract requirements such as task framing, JSON output shape, `reply` versus `skip`, concise `why_it_works`, and reply-count limits.
 - Use the user's pasted ideas and the linked post text as the primary material.
 - If a new content standard is durable and user-specific, add it to the configured guidelines rather than hardcoding it into the app prompt.

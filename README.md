@@ -106,7 +106,7 @@ The default config stores:
 with `codex login`.
 
 By default, `replyguy` injects only
-`/home/ryan/Subagents/cmo/REPLY_GUY_GUIDELINES.md` as standing
+`/home/ryan/Apps/replyguy/context/copy/REPLY_GUY_GUIDELINES.md` as standing
 context for drafting.
 
 ## State
